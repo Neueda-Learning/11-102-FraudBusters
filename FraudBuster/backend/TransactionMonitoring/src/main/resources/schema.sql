@@ -1,0 +1,245 @@
+CREATE TABLE IF NOT EXISTS transactions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    txn_id VARCHAR(64) NOT NULL,
+    account_id VARCHAR(64) NOT NULL,
+    customer_full_name VARCHAR(120) NULL,
+    customer_email VARCHAR(150) NULL,
+    customer_phone VARCHAR(20) NULL,
+    payee_id VARCHAR(64) NOT NULL,
+    amount DECIMAL(18,2) NOT NULL,
+    currency CHAR(3) NOT NULL DEFAULT 'USD',
+    txn_type ENUM('DEBIT','CREDIT') NOT NULL default 'DEBIT',
+    txn_timestamp DATETIME(3) NOT NULL,
+    monitor_state ENUM('RECEIVED','HELD','RELEASED','DECLINED') NOT NULL DEFAULT 'RECEIVED',
+    hold_started_at DATETIME(3) NULL,
+    hold_expires_at DATETIME(3) NULL,
+    final_decision ENUM('PENDING','ALLOW','DECLINE') NOT NULL DEFAULT 'PENDING',
+    decision_reason VARCHAR(120) NULL,
+    decided_at DATETIME(3) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_transactions_txn_id (txn_id),
+    KEY idx_transactions_account_timestamp (account_id, txn_timestamp),
+    KEY idx_transactions_customer_email (customer_email),
+    KEY idx_transactions_customer_phone (customer_phone),
+    KEY idx_transactions_payee_timestamp (payee_id, txn_timestamp),
+    KEY idx_transactions_monitor_state_timestamp (monitor_state, txn_timestamp),
+    KEY idx_transactions_txn_timestamp (txn_timestamp)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS rules (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    -- Stable machine-readable identifier used by the rule engine and APIs.
+    rule_code VARCHAR(64) NOT NULL,
+
+    -- Operator-friendly name and description for the rule-management screen.
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(500) NULL,
+
+    -- MVP rule categories, for example VELOCITY, AMOUNT, LOCATION, DEVICE.
+    rule_type VARCHAR(50) NOT NULL,
+
+    -- Default severity copied to an alert when this rule is triggered.
+    severity_default ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') NOT NULL DEFAULT 'MEDIUM',
+
+    -- INLINE rules can block/hold during payment; POST_AUTH rules create an
+    -- alert after the transaction has been accepted for monitoring.
+    inline_mode ENUM('INLINE', 'POST_AUTH') NOT NULL DEFAULT 'POST_AUTH',
+
+    -- Rule-specific thresholds/configuration, kept flexible for the MVP.
+    -- Example: {"maxAttempts":5,"windowMinutes":10}
+    config_json JSON NOT NULL,
+
+    -- Only active rules participate in evaluation. Soft deletion preserves audit history.
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_rules_rule_code (rule_code),
+    KEY idx_rules_active (is_active, is_deleted),
+    KEY idx_rules_type (rule_type),
+    CONSTRAINT chk_rules_config_json CHECK (JSON_VALID(config_json))
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS alerts (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    -- Stable human/API-friendly identifier shown in dashboards and logs.
+    alert_code VARCHAR(64) NOT NULL,
+
+    -- The rule that generated this alert.
+    rule_id BIGINT UNSIGNED NOT NULL,
+
+    -- Copied from rules.severity_default when the alert is created.
+    severity ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') NOT NULL,
+
+    -- MVP operator workflow:
+    -- OPEN -> ACKNOWLEDGED -> INVESTIGATING -> CLOSED
+    -- DISMISSED is used when the alert is a false positive.
+    status ENUM('OPEN', 'ACKNOWLEDGED', 'INVESTIGATING', 'CLOSED', 'DISMISSED')
+        NOT NULL DEFAULT 'OPEN',
+
+    -- Optional numeric score for sorting risky alerts first in the dashboard.
+    risk_score DECIMAL(5,2) NULL,
+
+    -- Short operator-facing summary and supporting details.
+    title VARCHAR(150) NOT NULL,
+    description VARCHAR(1000) NULL,
+
+    -- Inline alerts can place a transaction on hold until reviewed.
+    hold_expires_at TIMESTAMP NULL,
+
+    -- Closure metadata for final investigation outcome.
+    closed_at TIMESTAMP NULL,
+    closure_reason VARCHAR(500) NULL,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_alerts_alert_code (alert_code),
+    KEY idx_alerts_rule_id (rule_id),
+    KEY idx_alerts_status_severity (status, severity),
+    KEY idx_alerts_created_at (created_at),
+    CONSTRAINT fk_alerts_rule
+        FOREIGN KEY (rule_id) REFERENCES rules (id)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS alert_transactions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    -- Alert generated by one or more suspicious transactions.
+    alert_id BIGINT UNSIGNED NOT NULL,
+
+    -- Transaction involved in the alert.
+    transaction_id BIGINT UNSIGNED NOT NULL,
+
+    -- Helps explain the transaction's role inside grouped alerts.
+    -- Example: TRIGGERING_TRANSACTION, RELATED_TRANSACTION.
+    relation_type VARCHAR(50) NOT NULL DEFAULT 'TRIGGERING_TRANSACTION',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_alert_transactions_pair (alert_id, transaction_id),
+    KEY idx_alert_transactions_alert_id (alert_id),
+    KEY idx_alert_transactions_transaction_id (transaction_id),
+    CONSTRAINT fk_alert_transactions_alert
+        FOREIGN KEY (alert_id) REFERENCES alerts (id),
+    CONSTRAINT fk_alert_transactions_transaction
+        FOREIGN KEY (transaction_id) REFERENCES transactions (id)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS alert_status_history (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    -- Alert whose status changed.
+    alert_id BIGINT UNSIGNED NOT NULL,
+
+    -- Previous status can be NULL for the initial system-created OPEN event.
+    old_status ENUM('OPEN', 'ACKNOWLEDGED', 'INVESTIGATING', 'CLOSED', 'DISMISSED') NULL,
+    new_status ENUM('OPEN', 'ACKNOWLEDGED', 'INVESTIGATING', 'CLOSED', 'DISMISSED') NOT NULL,
+
+    -- MVP has no auth yet, so actor is stored as display text.
+    -- Example: SYSTEM, operator-1, risk-reviewer.
+    changed_by VARCHAR(100) NOT NULL DEFAULT 'SYSTEM',
+
+    -- Operator/system reason shown in investigation history.
+    change_reason VARCHAR(500) NULL,
+
+    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    KEY idx_alert_status_history_alert_id (alert_id),
+    KEY idx_alert_status_history_changed_at (changed_at),
+    CONSTRAINT fk_alert_status_history_alert
+        FOREIGN KEY (alert_id) REFERENCES alerts (id)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS alert_actions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    -- Alert on which the action was performed.
+    alert_id BIGINT UNSIGNED NOT NULL,
+
+    -- Optional transaction when the action is about one specific transaction.
+    transaction_id BIGINT UNSIGNED NULL,
+
+    -- MVP action categories for the operator investigation timeline.
+    action_type ENUM(
+        'NOTE_ADDED',
+        'CUSTOMER_VERIFIED',
+        'TRANSACTION_RELEASED',
+        'TRANSACTION_DECLINED',
+        'ESCALATED'
+    ) NOT NULL,
+
+    -- Who performed the action. MVP has no auth yet, so this is display text.
+    -- Example: SYSTEM, operator-1.
+    performed_by VARCHAR(100) NOT NULL DEFAULT 'SYSTEM',
+
+    -- Human-readable details for the alert activity timeline.
+    action_note VARCHAR(1000) NULL,
+
+    performed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    KEY idx_alert_actions_alert_id (alert_id),
+    KEY idx_alert_actions_transaction_id (transaction_id),
+    KEY idx_alert_actions_action_type (action_type),
+    KEY idx_alert_actions_performed_at (performed_at),
+    CONSTRAINT fk_alert_actions_alert
+        FOREIGN KEY (alert_id) REFERENCES alerts (id),
+    CONSTRAINT fk_alert_actions_transaction
+        FOREIGN KEY (transaction_id) REFERENCES transactions (id)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS transaction_decisions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    -- Transaction that received the final monitoring decision.
+    transaction_id BIGINT UNSIGNED NOT NULL,
+
+    -- Alert that influenced this decision. Nullable for future non-alert decisions.
+    alert_id BIGINT UNSIGNED NULL,
+
+    -- Final outcome sent back to the payment flow.
+    decision ENUM('ALLOW', 'DECLINE') NOT NULL,
+
+    -- Who made the decision. MVP has no auth yet, so this is display text.
+    -- Example: SYSTEM, operator-1.
+    decided_by VARCHAR(100) NOT NULL DEFAULT 'SYSTEM',
+
+    -- Business reason shown in audit logs and transaction details.
+    decision_reason VARCHAR(500) NOT NULL,
+
+    decided_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    KEY idx_transaction_decisions_transaction_id (transaction_id),
+    KEY idx_transaction_decisions_alert_id (alert_id),
+    KEY idx_transaction_decisions_decision (decision),
+    CONSTRAINT fk_transaction_decisions_transaction
+        FOREIGN KEY (transaction_id) REFERENCES transactions (id),
+    CONSTRAINT fk_transaction_decisions_alert
+        FOREIGN KEY (alert_id) REFERENCES alerts (id)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+

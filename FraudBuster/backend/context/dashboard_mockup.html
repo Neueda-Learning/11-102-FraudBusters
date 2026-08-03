@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Transaction Monitoring Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; min-height: 100vh; }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 220px; background: #1a1f36; color: #fff; padding: 24px 0;
+      position: fixed; height: 100vh; display: flex; flex-direction: column;
+    }
+    .sidebar .logo {
+      font-size: 17px; font-weight: 700; padding: 0 20px 24px;
+      color: #7c83fd; border-bottom: 1px solid #2e3455; letter-spacing: 0.5px;
+    }
+    .sidebar .logo span { color: #fff; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 20px; cursor: pointer; font-size: 14px;
+      color: #9aa0c0; transition: all 0.2s;
+    }
+    .nav-item:hover, .nav-item.active { background: #2e3455; color: #fff; }
+    .nav-item.active { border-left: 3px solid #7c83fd; }
+    .nav-item .icon { font-size: 18px; }
+    .nav-section { font-size: 11px; color: #555e8a; padding: 16px 20px 6px; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* MAIN */
+    .main { margin-left: 220px; flex: 1; padding: 28px; }
+
+    /* TOPBAR */
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px;
+    }
+    .topbar h1 { font-size: 22px; color: #1a1f36; font-weight: 700; }
+    .topbar .sub { font-size: 13px; color: #888; margin-top: 2px; }
+    .btn { padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .btn-primary { background: #7c83fd; color: #fff; }
+    .btn-primary:hover { background: #5c64e0; }
+
+    /* SUMMARY CARDS */
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      border-top: 4px solid transparent;
+    }
+    .card.red { border-color: #ef4444; }
+    .card.yellow { border-color: #f59e0b; }
+    .card.blue { border-color: #3b82f6; }
+    .card.green { border-color: #10b981; }
+    .card .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card .value { font-size: 32px; font-weight: 800; margin: 6px 0 4px; color: #1a1f36; }
+    .card .badge {
+      display: inline-block; font-size: 11px; padding: 2px 8px;
+      border-radius: 20px; font-weight: 600;
+    }
+    .badge-red { background: #fee2e2; color: #ef4444; }
+    .badge-yellow { background: #fef3c7; color: #d97706; }
+    .badge-blue { background: #dbeafe; color: #3b82f6; }
+    .badge-green { background: #d1fae5; color: #10b981; }
+
+    /* TABS */
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab {
+      padding: 8px 20px; border-radius: 8px; font-size: 13px;
+      cursor: pointer; border: none; background: #e5e7eb; color: #555; font-weight: 600;
+    }
+    .tab.active { background: #7c83fd; color: #fff; }
+
+    /* TABLE SECTION */
+    .section {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07); margin-bottom: 20px;
+    }
+    .section-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 20px; border-bottom: 1px solid #f0f0f0;
+    }
+    .section-header h2 { font-size: 15px; font-weight: 700; color: #1a1f36; }
+    .search-bar {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .search-bar input {
+      padding: 7px 14px; border: 1px solid #e0e0e0; border-radius: 8px;
+      font-size: 13px; width: 200px; outline: none;
+    }
+    .filter-btn {
+      padding: 7px 14px; border: 1px solid #e0e0e0; border-radius: 8px;
+      font-size: 12px; cursor: pointer; background: #fff; color: #555;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left; padding: 12px 16px;
+      background: #f8f9fb; color: #888;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    td { padding: 13px 16px; border-top: 1px solid #f3f4f6; color: #333; vertical-align: middle; }
+    tr:hover td { background: #fafbff; }
+
+    .severity-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    }
+    .sev-high { background: #fee2e2; color: #dc2626; }
+    .sev-medium { background: #fef3c7; color: #d97706; }
+    .sev-low { background: #dbeafe; color: #2563eb; }
+
+    .status-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .st-open { background: #fee2e2; color: #dc2626; }
+    .st-acknowledged { background: #fef3c7; color: #b45309; }
+    .st-investigating { background: #ede9fe; color: #7c3aed; }
+    .st-closed { background: #d1fae5; color: #059669; }
+    .st-dismissed { background: #f3f4f6; color: #6b7280; }
+
+    .alert-indicator {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; background: #ef4444; margin-right: 4px;
+    }
+
+    /* ACTION BUTTONS */
+    .action-btn {
+      padding: 4px 10px; border-radius: 6px; font-size: 11px;
+      border: 1px solid #e0e0e0; cursor: pointer; background: #fff;
+      margin-right: 4px; color: #444; font-weight: 600;
+    }
+    .action-btn:hover { background: #f0f0ff; border-color: #7c83fd; color: #7c83fd; }
+    .action-btn.ack { border-color: #10b981; color: #10b981; }
+    .action-btn.dismiss { border-color: #ef4444; color: #ef4444; }
+
+    /* TWO COLUMN LAYOUT */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* MINI CHART PLACEHOLDER */
+    .chart-placeholder {
+      height: 120px; background: linear-gradient(135deg, #f0f4ff, #e8ecff);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      color: #aaa; font-size: 13px; margin: 16px;
+    }
+    .chart-bar-container { display: flex; align-items: flex-end; gap: 6px; padding: 16px 20px; height: 100px; }
+    .bar {
+      flex: 1; border-radius: 4px 4px 0 0; opacity: 0.85;
+      transition: all 0.3s;
+    }
+    .bar:hover { opacity: 1; }
+    .bar-label { text-align: center; font-size: 10px; color: #888; margin-top: 4px; }
+
+    /* ALERT DETAIL PANEL */
+    .alert-detail {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07); padding: 20px;
+      border-left: 4px solid #ef4444;
+    }
+    .alert-detail h3 { font-size: 14px; font-weight: 700; color: #1a1f36; margin-bottom: 12px; }
+    .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+    .detail-row .key { color: #888; }
+    .detail-row .val { font-weight: 600; color: #333; }
+    .action-group { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .action-group .btn { font-size: 12px; padding: 7px 14px; }
+    .btn-ack { background: #10b981; color: #fff; }
+    .btn-inv { background: #7c3aed; color: #fff; }
+    .btn-close { background: #3b82f6; color: #fff; }
+    .btn-dismiss { background: #ef4444; color: #fff; }
+
+    /* RULES TABLE */
+    .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .toggle input { display: none; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc; border-radius: 20px; transition: 0.3s;
+    }
+    .slider::before {
+      content: ''; position: absolute; height: 14px; width: 14px;
+      left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s;
+    }
+    .toggle input:checked + .slider { background: #7c83fd; }
+    .toggle input:checked + .slider::before { transform: translateX(16px); }
+
+    /* LIFECYCLE */
+    .lifecycle {
+      display: flex; align-items: center; gap: 0; padding: 16px 20px; overflow-x: auto;
+    }
+    .lc-step {
+      display: flex; flex-direction: column; align-items: center;
+      min-width: 100px; font-size: 12px; font-weight: 600;
+    }
+    .lc-circle {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; border: 2px solid #e0e0e0; background: #f8f9fb;
+      margin-bottom: 6px;
+    }
+    .lc-circle.done { background: #7c83fd; border-color: #7c83fd; color: white; }
+    .lc-circle.current { background: #fef3c7; border-color: #f59e0b; }
+    .lc-arrow { font-size: 18px; color: #ccc; margin: 0 -8px; padding-bottom: 22px; }
+
+    .page { display: none; }
+    .page.active { display: block; }
+    footer { text-align: center; padding: 20px; font-size: 12px; color: #bbb; }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo">🔍 <span>TxMonitor</span></div>
+
+  <div class="nav-section">Main</div>
+  <div class="nav-item active" onclick="showPage('dashboard')">
+    <span class="icon">📊</span> Dashboard
+  </div>
+  <div class="nav-item" onclick="showPage('alerts')">
+    <span class="icon">🔔</span> Alerts
+    <span class="badge badge-red" style="margin-left:auto;">7</span>
+  </div>
+  <div class="nav-item" onclick="showPage('transactions')">
+    <span class="icon">💳</span> Transactions
+  </div>
+  <div class="nav-section">Config</div>
+  <div class="nav-item" onclick="showPage('rules')">
+    <span class="icon">⚙️</span> Rules
+  </div>
+  <div class="nav-item" onclick="showPage('history')">
+    <span class="icon">📜</span> Alert History
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+  <!-- ========== DASHBOARD PAGE ========== -->
+  <div id="page-dashboard" class="page active">
+    <div class="topbar">
+      <div>
+        <h1>📊 Dashboard</h1>
+        <div class="sub">Real-time transaction monitoring overview</div>
+      </div>
+      <button class="btn btn-primary" onclick="alert('Generating test transactions...')" hidden aria-hidden="true">+ Generate Test Data</button>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="cards">
+      <div class="card red">
+        <div class="label">Open Alerts</div>
+        <div class="value">7</div>
+        <span class="badge badge-red">⚠ Needs Attention</span>
+      </div>
+      <div class="card yellow">
+        <div class="label">Acknowledged</div>
+        <div class="value">3</div>
+        <span class="badge badge-yellow">🔍 In Review</span>
+      </div>
+      <div class="card blue">
+        <div class="label">Transactions Today</div>
+        <div class="value">142</div>
+        <span class="badge badge-blue">↑ +18 from yesterday</span>
+      </div>
+      <div class="card green">
+        <div class="label">Alerts Closed Today</div>
+        <div class="value">5</div>
+        <span class="badge badge-green">✓ Resolved</span>
+      </div>
+    </div>
+
+    <!-- CHART + ALERT DETAIL -->
+    <div class="two-col" style="margin-bottom:20px;">
+      <div class="section">
+        <div class="section-header">
+          <h2>📈 Alerts by Severity (This Week)</h2>
+        </div>
+        <div style="padding: 16px 20px 8px;">
+          <div style="display:flex; align-items:flex-end; gap:10px; height:100px;">
+            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+              <div class="bar" style="height:80px;background:#ef4444;width:100%;border-radius:6px 6px 0 0;"></div>
+              <div class="bar-label">Mon</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+              <div class="bar" style="height:50px;background:#f59e0b;width:100%;border-radius:6px 6px 0 0;"></div>
+              <div class="bar-label">Tue</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+              <div class="bar" style="height:65px;background:#ef4444;width:100%;border-radius:6px 6px 0 0;"></div>
+              <div class="bar-label">Wed</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+              <div class="bar" style="height:30px;background:#3b82f6;width:100%;border-radius:6px 6px 0 0;"></div>
+              <div class="bar-label">Thu</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+              <div class="bar" style="height:90px;background:#ef4444;width:100%;border-radius:6px 6px 0 0;"></div>
+              <div class="bar-label">Fri</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+              <div class="bar" style="height:40px;background:#f59e0b;width:100%;border-radius:6px 6px 0 0;"></div>
+              <div class="bar-label">Sat</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+              <div class="bar" style="height:55px;background:#3b82f6;width:100%;border-radius:6px 6px 0 0;"></div>
+              <div class="bar-label">Sun</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;">
+            <span>🔴 HIGH</span><span>🟡 MEDIUM</span><span>🔵 LOW</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALERT LIFECYCLE -->
+      <div class="section">
+        <div class="section-header"><h2>🔄 Alert Lifecycle</h2></div>
+        <div class="lifecycle">
+          <div class="lc-step">
+            <div class="lc-circle done">✓</div>
+            <span>OPEN</span>
+          </div>
+          <div class="lc-arrow">→</div>
+          <div class="lc-step">
+            <div class="lc-circle current">👁</div>
+            <span>ACK'D</span>
+          </div>
+          <div class="lc-arrow">→</div>
+          <div class="lc-step">
+            <div class="lc-circle">🔍</div>
+            <span>INVEST.</span>
+          </div>
+          <div class="lc-arrow">→</div>
+          <div class="lc-step">
+            <div class="lc-circle">✅</div>
+            <span>CLOSED</span>
+          </div>
+          <br/>
+        </div>
+        <div style="padding:0 20px 16px;font-size:12px;color:#888;">
+          ↳ At any step: can be <span style="color:#6b7280;font-weight:700;">DISMISSED</span> as false positive
+        </div>
+      </div>
+    </div>
+
+    <!-- RECENT ALERTS TABLE -->
+    <div class="section">
+      <div class="section-header">
+        <h2>🔔 Recent Open Alerts</h2>
+        <button class="btn btn-primary" onclick="showPage('alerts')">View All</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Alert ID</th><th>Severity</th><th>Rule Triggered</th>
+            <th>Account</th><th>Created</th><th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>#ALT-001</td>
+            <td><span class="severity-badge sev-high">● HIGH</span></td>
+            <td>Amount Threshold</td><td>ACC-001</td>
+            <td>Today 09:14</td>
+            <td><span class="status-badge st-open">OPEN</span></td>
+            <td>
+              <button class="action-btn ack">Acknowledge</button>
+              <button class="action-btn dismiss">Dismiss</button>
+            </td>
+          </tr>
+          <tr>
+            <td>#ALT-002</td>
+            <td><span class="severity-badge sev-high">● HIGH</span></td>
+            <td>Velocity Rule</td><td>ACC-002</td>
+            <td>Today 10:02</td>
+            <td><span class="status-badge st-acknowledged">ACKNOWLEDGED</span></td>
+            <td>
+              <button class="action-btn">Investigate</button>
+              <button class="action-btn dismiss">Dismiss</button>
+            </td>
+          </tr>
+          <tr>
+            <td>#ALT-003</td>
+            <td><span class="severity-badge sev-medium">● MEDIUM</span></td>
+            <td>New Payee</td><td>ACC-003</td>
+            <td>Today 11:30</td>
+            <td><span class="status-badge st-open">OPEN</span></td>
+            <td>
+              <button class="action-btn ack">Acknowledge</button>
+              <button class="action-btn dismiss">Dismiss</button>
+            </td>
+          </tr>
+          <tr>
+            <td>#ALT-004</td>
+            <td><span class="severity-badge sev-low">● LOW</span></td>
+            <td>Daily Limit</td><td>ACC-001</td>
+            <td>Today 13:45</td>
+            <td><span class="status-badge st-investigating">INVESTIGATING</span></td>
+            <td>
+              <button class="action-btn">Close</button>
+              <button class="action-btn dismiss">Dismiss</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== ALERTS PAGE ========== -->
+  <div id="page-alerts" class="page">
+    <div class="topbar">
+      <div><h1>🔔 All Alerts</h1><div class="sub">Manage alert lifecycle</div></div>
+    </div>
+    <div class="tabs">
+      <button class="tab active">All (10)</button>
+      <button class="tab">Open (7)</button>
+      <button class="tab">Acknowledged (3)</button>
+      <button class="tab">Investigating (1)</button>
+    </div>
+
+    <div class="two-col">
+      <!-- ALERT LIST -->
+      <div class="section">
+        <div class="section-header">
+          <h2>Alert List</h2>
+          <div class="search-bar">
+            <input type="text" placeholder="🔍 Search alerts..."/>
+            <button class="filter-btn">⚙ Filter</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Severity</th><th>Rule</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr onclick="document.getElementById('alert-detail').style.display='block'" style="cursor:pointer;">
+              <td>#ALT-001</td>
+              <td><span class="severity-badge sev-high">● HIGH</span></td>
+              <td>Amount Threshold</td>
+              <td><span class="status-badge st-open">OPEN</span></td>
+            </tr>
+            <tr style="cursor:pointer;">
+              <td>#ALT-002</td>
+              <td><span class="severity-badge sev-high">● HIGH</span></td>
+              <td>Velocity Rule</td>
+              <td><span class="status-badge st-acknowledged">ACK'D</span></td>
+            </tr>
+            <tr style="cursor:pointer;">
+              <td>#ALT-003</td>
+              <td><span class="severity-badge sev-medium">● MED</span></td>
+              <td>New Payee</td>
+              <td><span class="status-badge st-open">OPEN</span></td>
+            </tr>
+            <tr style="cursor:pointer;">
+              <td>#ALT-004</td>
+              <td><span class="severity-badge sev-low">● LOW</span></td>
+              <td>Daily Limit</td>
+              <td><span class="status-badge st-investigating">INVEST.</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ALERT DETAIL PANEL -->
+      <div id="alert-detail" class="alert-detail">
+        <h3>🔍 Alert Detail — #ALT-001</h3>
+        <div class="detail-row"><span class="key">Status</span><span class="val"><span class="status-badge st-open">OPEN</span></span></div>
+        <div class="detail-row"><span class="key">Severity</span><span class="val"><span class="severity-badge sev-high">● HIGH</span></span></div>
+        <div class="detail-row"><span class="key">Rule Triggered</span><span class="val">Amount Threshold</span></div>
+        <div class="detail-row"><span class="key">Account</span><span class="val">ACC-001</span></div>
+        <div class="detail-row"><span class="key">Amount</span><span class="val" style="color:#ef4444;">$15,000.00</span></div>
+        <div class="detail-row"><span class="key">Payee</span><span class="val">PAYEE-XYZ</span></div>
+        <div class="detail-row"><span class="key">Created At</span><span class="val">2026-07-30 09:14:22</span></div>
+        <div class="detail-row"><span class="key">Threshold</span><span class="val">$10,000</span></div>
+        <div style="margin-top:12px;font-size:12px;font-weight:700;color:#888;margin-bottom:4px;">RELATED TRANSACTION</div>
+        <table>
+          <thead><tr><th>Txn ID</th><th>Amount</th><th>Time</th></tr></thead>
+          <tbody>
+            <tr><td>TXN-8821</td><td style="color:#ef4444;font-weight:700;">$15,000</td><td>09:13:59</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:12px;font-size:12px;font-weight:700;color:#888;margin-bottom:4px;">ACTIONS</div>
+        <div class="action-group">
+          <button class="btn btn-ack" onclick="alert('Alert Acknowledged!')">✓ Acknowledge</button>
+          <button class="btn btn-inv" onclick="alert('Marked as Investigating!')">🔍 Investigate</button>
+          <button class="btn btn-close" onclick="alert('Alert Closed!')">✅ Close</button>
+          <button class="btn btn-dismiss" onclick="alert('Alert Dismissed as False Positive!')">✗ Dismiss</button>
+        </div>
+        <div style="margin-top:12px;">
+          <textarea placeholder="Add resolution notes here..." style="width:100%;padding:8px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;height:60px;resize:none;"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TRANSACTIONS PAGE ========== -->
+  <div id="page-transactions" class="page">
+    <div class="topbar">
+      <div><h1>💳 Transactions</h1><div class="sub">All recorded transactions</div></div>
+      <button class="btn btn-primary" onclick="alert('Transaction added!')">+ Add Transaction</button>
+    </div>
+
+    <div class="cards" style="grid-template-columns:repeat(3,1fr);">
+      <div class="card blue">
+        <div class="label">Total Transactions</div>
+        <div class="value">142</div>
+      </div>
+      <div class="card green">
+        <div class="label">Total Volume</div>
+        <div class="value">$842K</div>
+      </div>
+      <div class="card red">
+        <div class="label">Alerts Triggered</div>
+        <div class="value">10</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <h2>Transaction List</h2>
+        <div class="search-bar">
+          <input type="text" placeholder="🔍 Search by ID, Account..."/>
+          <input type="date" style="padding:7px;border:1px solid #e0e0e0;border-radius:8px;font-size:12px;"/>
+          <button class="filter-btn">Amount ▾</button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Txn ID</th><th>Account</th><th>Payee</th>
+            <th>Amount</th><th>Type</th><th>Timestamp</th><th>Alert?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>TXN-8821</td><td>ACC-001</td><td>PAYEE-XYZ</td>
+            <td style="font-weight:700;color:#ef4444;">$15,000</td><td>DEBIT</td>
+            <td>2026-07-30 09:13</td>
+            <td><span class="alert-indicator"></span><span style="font-size:11px;color:#ef4444;">HIGH Alert</span></td>
+          </tr>
+          <tr>
+            <td>TXN-8822</td><td>ACC-002</td><td>PAYEE-A</td>
+            <td>$200</td><td>DEBIT</td>
+            <td>2026-07-30 10:01</td><td>—</td>
+          </tr>
+          <tr>
+            <td>TXN-8823</td><td>ACC-002</td><td>PAYEE-A</td>
+            <td>$150</td><td>DEBIT</td>
+            <td>2026-07-30 10:02</td><td>—</td>
+          </tr>
+          <tr>
+            <td>TXN-8824</td><td>ACC-002</td><td>PAYEE-A</td>
+            <td>$300</td><td>DEBIT</td>
+            <td>2026-07-30 10:03</td><td>—</td>
+          </tr>
+          <tr>
+            <td>TXN-8825</td><td>ACC-002</td><td>PAYEE-A</td>
+            <td>$100</td><td>DEBIT</td>
+            <td>2026-07-30 10:04</td><td>—</td>
+          </tr>
+          <tr>
+            <td>TXN-8826</td><td>ACC-002</td><td>PAYEE-A</td>
+            <td>$250</td><td>DEBIT</td>
+            <td>2026-07-30 10:05</td>
+            <td><span class="alert-indicator"></span><span style="font-size:11px;color:#f59e0b;">MEDIUM Alert (Velocity)</span></td>
+          </tr>
+          <tr>
+            <td>TXN-8827</td><td>ACC-003</td><td>PAYEE-NEW-001</td>
+            <td>$5,000</td><td>DEBIT</td>
+            <td>2026-07-30 11:29</td>
+            <td><span class="alert-indicator"></span><span style="font-size:11px;color:#f59e0b;">New Payee Alert</span></td>
+          </tr>
+          <tr>
+            <td>TXN-8828</td><td>ACC-001</td><td>PAYEE-B</td>
+            <td>$800</td><td>CREDIT</td>
+            <td>2026-07-30 13:10</td><td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== RULES PAGE ========== -->
+  <div id="page-rules" class="page">
+    <div class="topbar">
+      <div><h1>⚙️ Monitoring Rules</h1><div class="sub">Configure alert trigger rules</div></div>
+    </div>
+    <div class="section">
+      <div class="section-header"><h2>Active Rules</h2></div>
+      <table>
+        <thead>
+          <tr><th>Rule Name</th><th>Type</th><th>Parameters</th><th>Severity</th><th>Active</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>High Value Transfer</strong></td>
+            <td>Amount Threshold</td>
+            <td>amount > $10,000</td>
+            <td><span class="severity-badge sev-high">● HIGH</span></td>
+            <td>
+              <label class="toggle"><input type="checkbox" checked/><span class="slider"></span></label>
+            </td>
+            <td>
+              <button class="action-btn">✏ Edit</button>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Rapid Transactions</strong></td>
+            <td>Velocity Rule</td>
+            <td>&gt;5 txns in 10 mins</td>
+            <td><span class="severity-badge sev-medium">● MEDIUM</span></td>
+            <td>
+              <label class="toggle"><input type="checkbox" checked/><span class="slider"></span></label>
+            </td>
+            <td>
+              <button class="action-btn">✏ Edit</button>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>New Payee Alert</strong></td>
+            <td>New Payee Rule</td>
+            <td>First txn to any payee</td>
+            <td><span class="severity-badge sev-medium">● MEDIUM</span></td>
+            <td>
+              <label class="toggle"><input type="checkbox" checked/><span class="slider"></span></label>
+            </td>
+            <td>
+              <button class="action-btn">✏ Edit</button>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Daily Limit Exceeded</strong></td>
+            <td>Daily Limit Rule</td>
+            <td>Daily total > $50,000</td>
+            <td><span class="severity-badge sev-low">● LOW</span></td>
+            <td>
+              <label class="toggle"><input type="checkbox"/><span class="slider"></span></label>
+            </td>
+            <td>
+              <button class="action-btn">✏ Edit</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== HISTORY PAGE ========== -->
+  <div id="page-history" class="page">
+    <div class="topbar">
+      <div><h1>📜 Alert History</h1><div class="sub">Closed and dismissed alerts</div></div>
+    </div>
+    <div class="section">
+      <div class="section-header">
+        <h2>Historical Alerts</h2>
+        <div class="search-bar">
+          <input type="date" style="padding:7px;border:1px solid #e0e0e0;border-radius:8px;font-size:12px;"/>
+          <button class="filter-btn">Status ▾</button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Alert ID</th><th>Severity</th><th>Rule</th><th>Opened At</th><th>Closed At</th><th>Final Status</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>#ALT-091</td>
+            <td><span class="severity-badge sev-high">● HIGH</span></td>
+            <td>Amount Threshold</td>
+            <td>2026-07-29 08:00</td>
+            <td>2026-07-29 09:30</td>
+            <td><span class="status-badge st-closed">CLOSED</span></td>
+            <td>Confirmed legitimate wire transfer</td>
+          </tr>
+          <tr>
+            <td>#ALT-092</td>
+            <td><span class="severity-badge sev-medium">● MEDIUM</span></td>
+            <td>Velocity Rule</td>
+            <td>2026-07-29 12:15</td>
+            <td>2026-07-29 12:45</td>
+            <td><span class="status-badge st-dismissed">DISMISSED</span></td>
+            <td>False positive — automated batch payments</td>
+          </tr>
+          <tr>
+            <td>#ALT-093</td>
+            <td><span class="severity-badge sev-low">● LOW</span></td>
+            <td>New Payee</td>
+            <td>2026-07-28 15:00</td>
+            <td>2026-07-28 16:00</td>
+            <td><span class="status-badge st-closed">CLOSED</span></td>
+            <td>Customer confirmed new supplier</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>TxMonitor MVP — Transaction Monitoring & Alerts Dashboard | UI Mockup v1.0</footer>
+</div>
+
+<script>
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+</script>
+</body>
+</html>

@@ -71,6 +71,7 @@ Implications:
 4. Alert details panel/page:
    - alert metadata
    - related transactions
+   - customer verification details: name, email, phone
    - actions: Acknowledge, Investigate, Close, Dismiss
 5. Alert history page:
    - closed/dismissed alerts
@@ -201,6 +202,9 @@ Step 7: Demo dry run                    → All 3
 - Keep MVP simple, but architecture decisions should not block future scaling.
 - No authentication in scope for current phase.
 - Single operator workflow assumed.
+- Persist all monitored transactions in DB (not only those with alerts) for rule evaluation, auditability, and dashboard accuracy.
+- `txn_type` supports `DEBIT` and `CREDIT`, but current ecommerce monitoring rules are mostly applied on `DEBIT` flows.
+- Customer verification fields for operator call flow are limited to `customer_full_name`, `customer_email`, `customer_phone` in MVP.
 
 ---
 

@@ -58,6 +58,9 @@ Typical columns:
 - `id` BIGINT PK
 - `txn_id` VARCHAR UNIQUE
 - `account_id` VARCHAR
+- `customer_full_name` VARCHAR(120)
+- `customer_email` VARCHAR(150)
+- `customer_phone` VARCHAR(20)
 - `payee_id` VARCHAR
 - `amount` DECIMAL(18,2)
 - `currency` CHAR(3)
@@ -75,6 +78,12 @@ Why it exists:
 - source of truth for each transaction
 - supports dashboard counts and transaction list page
 - stores inline decision and hold-window fields
+- stores customer contact details for operator verification calls
+- stores all monitored transactions, not only those that generated alerts
+
+MVP implementation notes:
+- customer details in this table are limited to `customer_full_name`, `customer_email`, and `customer_phone`
+- `txn_type` remains `DEBIT`/`CREDIT`, but current ecommerce payment-path rules are primarily evaluated for `DEBIT`
 
 ---
 
@@ -240,6 +249,8 @@ Example:
 ### `transactions`
 - `UNIQUE(txn_id)`
 - `INDEX(account_id, txn_timestamp)`
+- `INDEX(customer_email)`
+- `INDEX(customer_phone)`
 - `INDEX(payee_id, txn_timestamp)`
 - `INDEX(monitor_state, txn_timestamp)`
 - `INDEX(txn_timestamp)`
@@ -276,4 +287,9 @@ Example:
 ## 8) Short summary
 
 We need a MySQL model centered on `transactions`, `rules`, `alerts`, and `alert_transactions`, with extra audit/history tables for alert lifecycle and transaction decisions. It must support many-to-many alert/transaction relationships, 10-minute hold window logic, auto-decline, and UI queries for dashboard, alerts, transactions, rules, and history.
+
+Additional MVP decisions finalized:
+- keep all incoming monitored transactions in `transactions` (do not keep only alerted transactions)
+- link suspicious events through `alerts` + `alert_transactions`
+- use customer contact fields in alert workflows for operator verification calls
 

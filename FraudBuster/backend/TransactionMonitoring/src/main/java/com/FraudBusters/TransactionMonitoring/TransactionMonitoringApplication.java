@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class TransactionMonitoringApplication {
 
 	public static void main(String[] args) {
+		System.out.println("Starting Transaction Monitoring Application...");
 		SpringApplication.run(TransactionMonitoringApplication.class, args);
 	}
 
