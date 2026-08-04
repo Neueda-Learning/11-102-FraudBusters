@@ -52,7 +52,7 @@ public class AlertEntity {
     @Column(name = "risk_score", precision = 5, scale = 2)
     private BigDecimal riskScore;
 
-    @Column(name = "title", nullable = false, length = 150)
+    @Column(name = "title", length = 150)
     private String title;
 
     @Column(name = "description", length = 1000)
