@@ -15,5 +15,7 @@ public interface RuleEntityRepository extends JpaRepository<RuleEntity, Long> {
 
     /** Find a specific rule by its stable rule_code (used for rule detail page) */
     Optional<RuleEntity> findByRuleCodeAndIsDeletedFalse(String ruleCode);
+
+    RuleEntity findByName(String s);
 }
 
