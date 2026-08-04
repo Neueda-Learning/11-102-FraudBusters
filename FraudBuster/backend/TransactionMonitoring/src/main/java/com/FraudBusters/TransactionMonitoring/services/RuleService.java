@@ -3,7 +3,7 @@ package com.FraudBusters.TransactionMonitoring.services;
 import com.FraudBusters.TransactionMonitoring.exceptions.ResourceNotFoundException;
 import com.FraudBusters.TransactionMonitoring.models.RuleEntity;
 import com.FraudBusters.TransactionMonitoring.models.dto.RuleResponseDTO;
-import com.FraudBusters.TransactionMonitoring.repository.RuleRepository;
+import com.FraudBusters.TransactionMonitoring.repository.RuleEntityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,13 +14,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RuleService {
 
-    private final RuleRepository ruleRepository;
+    private final RuleEntityRepository ruleEntityRepository;
 
     /**
      * Returns all active (non-deleted) rules for the frontend rules list screen.
      */
     public List<RuleResponseDTO> getAllActiveRules() {
-        return ruleRepository.findByIsActiveTrueAndIsDeletedFalse()
+        return ruleEntityRepository.findByIsActiveTrueAndIsDeletedFalse()
                 .stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -30,7 +30,7 @@ public class RuleService {
      * Returns a single rule by its ruleCode for the rule detail view.
      */
     public RuleResponseDTO getRuleByCode(String ruleCode) {
-        RuleEntity rule = ruleRepository.findByRuleCodeAndIsDeletedFalse(ruleCode)
+        RuleEntity rule = ruleEntityRepository.findByRuleCodeAndIsDeletedFalse(ruleCode)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Rule not found with code: " + ruleCode));
         return toDTO(rule);

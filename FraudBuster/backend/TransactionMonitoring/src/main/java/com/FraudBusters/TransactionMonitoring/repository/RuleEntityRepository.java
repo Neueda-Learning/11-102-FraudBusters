@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface RuleRepository extends JpaRepository<RuleEntity, Long> {
+public interface RuleEntityRepository extends JpaRepository<RuleEntity, Long> {
 
     /** All rules that are active and not soft-deleted (used for the Rules list screen) */
     List<RuleEntity> findByIsActiveTrueAndIsDeletedFalse();
