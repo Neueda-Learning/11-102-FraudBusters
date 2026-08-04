@@ -5,164 +5,378 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Transaction Monitoring Dashboard</title>
   <style>
+    :root {
+      --bg-page: #eef2f8;
+      --bg-panel: #ffffff;
+      --bg-soft: #f6f8fc;
+      --text-main: #1f2a44;
+      --text-muted: #6c758f;
+      --text-faint: #8b95ae;
+      --accent: #6673e8;
+      --accent-dark: #4d58c6;
+      --border: #e3e8f2;
+      --shadow: 0 8px 24px rgba(23, 35, 79, 0.08);
+      --radius: 12px;
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; min-height: 100vh; }
 
-    /* SIDEBAR */
+    body {
+      font-family: "Segoe UI", "Inter", Arial, sans-serif;
+      background: linear-gradient(180deg, #f5f7fb 0%, var(--bg-page) 100%);
+      color: var(--text-main);
+      display: flex;
+      min-height: 100vh;
+      line-height: 1.45;
+    }
+
     .sidebar {
-      width: 220px; background: #1a1f36; color: #fff; padding: 24px 0;
-      position: fixed; height: 100vh; display: flex; flex-direction: column;
+      width: 236px;
+      background: linear-gradient(180deg, #1e2640 0%, #1b233b 100%);
+      color: #fff;
+      padding: 24px 0;
+      position: fixed;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 8px 0 20px rgba(18, 25, 50, 0.28);
     }
+
     .sidebar .logo {
-      font-size: 17px; font-weight: 700; padding: 0 20px 24px;
-      color: #7c83fd; border-bottom: 1px solid #2e3455; letter-spacing: 0.5px;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 0 22px 24px;
+      color: #8f97ff;
+      border-bottom: 1px solid #2f3759;
+      letter-spacing: 0.4px;
     }
-    .sidebar .logo span { color: #fff; }
+
+    .sidebar .logo span { color: #f8f9ff; }
+
+    .nav-section {
+      font-size: 11px;
+      color: #6d77a3;
+      padding: 18px 22px 8px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-weight: 700;
+    }
+
     .nav-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 20px; cursor: pointer; font-size: 14px;
-      color: #9aa0c0; transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 22px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #a9b0cf;
+      transition: background 0.2s ease, color 0.2s ease;
+      border-left: 3px solid transparent;
     }
-    .nav-item:hover, .nav-item.active { background: #2e3455; color: #fff; }
-    .nav-item.active { border-left: 3px solid #7c83fd; }
+
     .nav-item .icon { font-size: 18px; }
-    .nav-section { font-size: 11px; color: #555e8a; padding: 16px 20px 6px; text-transform: uppercase; letter-spacing: 1px; }
 
-    /* MAIN */
-    .main { margin-left: 220px; flex: 1; padding: 28px; }
+    .nav-item:hover,
+    .nav-item.active {
+      background: #2e3658;
+      color: #ffffff;
+    }
 
-    /* TOPBAR */
+    .nav-item.active { border-left-color: #8f97ff; }
+
+    .main {
+      margin-left: 236px;
+      flex: 1;
+      padding: 30px;
+      min-width: 0;
+    }
+
     .topbar {
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 22px;
+      gap: 14px;
+    }
+
+    .topbar h1 { font-size: 24px; color: #1d2741; font-weight: 700; }
+    .topbar .sub { font-size: 14px; color: var(--text-muted); margin-top: 3px; }
+
+    .btn {
+      padding: 9px 18px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 5px 14px rgba(102, 115, 232, 0.35);
+    }
+
+    .btn-primary:hover { background: var(--accent-dark); }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
       margin-bottom: 24px;
     }
-    .topbar h1 { font-size: 22px; color: #1a1f36; font-weight: 700; }
-    .topbar .sub { font-size: 13px; color: #888; margin-top: 2px; }
-    .btn { padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
-    .btn-primary { background: #7c83fd; color: #fff; }
-    .btn-primary:hover { background: #5c64e0; }
 
-    /* SUMMARY CARDS */
-    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .cards-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
     .card {
-      background: #fff; border-radius: 12px; padding: 20px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      background: var(--bg-panel);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
       border-top: 4px solid transparent;
     }
+
     .card.red { border-color: #ef4444; }
     .card.yellow { border-color: #f59e0b; }
     .card.blue { border-color: #3b82f6; }
     .card.green { border-color: #10b981; }
-    .card .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-    .card .value { font-size: 32px; font-weight: 800; margin: 6px 0 4px; color: #1a1f36; }
-    .card .badge {
-      display: inline-block; font-size: 11px; padding: 2px 8px;
-      border-radius: 20px; font-weight: 600;
-    }
-    .badge-red { background: #fee2e2; color: #ef4444; }
-    .badge-yellow { background: #fef3c7; color: #d97706; }
-    .badge-blue { background: #dbeafe; color: #3b82f6; }
-    .badge-green { background: #d1fae5; color: #10b981; }
 
-    /* TABS */
-    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .card .label {
+      font-size: 12px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.65px;
+      font-weight: 600;
+    }
+
+    .card .value {
+      font-size: 32px;
+      font-weight: 800;
+      margin: 6px 0 4px;
+      color: #1d2741;
+      line-height: 1.1;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+    }
+
+    .badge-red { background: #fee2e2; color: #dc2626; }
+    .badge-yellow { background: #fef3c7; color: #b45309; }
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .badge-green { background: #d1fae5; color: #047857; }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+
     .tab {
-      padding: 8px 20px; border-radius: 8px; font-size: 13px;
-      cursor: pointer; border: none; background: #e5e7eb; color: #555; font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 9px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #dce1ee;
+      background: #edf1f8;
+      color: #46506a;
+      font-weight: 600;
     }
-    .tab.active { background: #7c83fd; color: #fff; }
 
-    /* TABLE SECTION */
+    .tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(102, 115, 232, 0.25);
+    }
+
     .section {
-      background: #fff; border-radius: 12px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07); margin-bottom: 20px;
+      background: var(--bg-panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+      overflow: hidden;
     }
+
     .section-header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 16px 20px; border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid #edf1f6;
+      gap: 10px;
     }
-    .section-header h2 { font-size: 15px; font-weight: 700; color: #1a1f36; }
-    .search-bar {
-      display: flex; gap: 8px; align-items: center;
+
+    .section-header h2 { font-size: 16px; font-weight: 700; color: #1d2741; }
+    .search-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .search-bar input,
+    .input-date {
+      padding: 8px 12px;
+      border: 1px solid #d9e0ec;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      background: #fff;
+      color: #2f3851;
+      min-height: 34px;
     }
-    .search-bar input {
-      padding: 7px 14px; border: 1px solid #e0e0e0; border-radius: 8px;
-      font-size: 13px; width: 200px; outline: none;
+
+    .search-bar input { width: 210px; }
+
+    .search-bar input:focus,
+    .input-date:focus,
+    .filter-btn:focus,
+    .action-btn:focus,
+    .btn:focus,
+    .tab:focus {
+      border-color: #a6b1ff;
+      box-shadow: 0 0 0 2px rgba(143, 151, 255, 0.25);
     }
+
     .filter-btn {
-      padding: 7px 14px; border: 1px solid #e0e0e0; border-radius: 8px;
-      font-size: 12px; cursor: pointer; background: #fff; color: #555;
+      padding: 8px 12px;
+      border: 1px solid #d9e0ec;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      background: #fff;
+      color: #425071;
+      font-weight: 600;
+      min-height: 34px;
     }
 
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
     th {
-      text-align: left; padding: 12px 16px;
-      background: #f8f9fb; color: #888;
-      font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+      text-align: left;
+      padding: 12px 16px;
+      background: var(--bg-soft);
+      color: #7b859f;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.65px;
+      font-weight: 700;
+      border-bottom: 1px solid #e7ecf5;
     }
-    td { padding: 13px 16px; border-top: 1px solid #f3f4f6; color: #333; vertical-align: middle; }
-    tr:hover td { background: #fafbff; }
+
+    td {
+      padding: 13px 16px;
+      border-top: 1px solid #eff2f7;
+      color: #2f3851;
+      vertical-align: middle;
+      font-size: 13px;
+    }
+
+    tbody tr:hover td { background: #f8faff; }
 
     .severity-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
     }
+
     .sev-high { background: #fee2e2; color: #dc2626; }
-    .sev-medium { background: #fef3c7; color: #d97706; }
-    .sev-low { background: #dbeafe; color: #2563eb; }
+    .sev-medium { background: #fef3c7; color: #b45309; }
+    .sev-low { background: #dbeafe; color: #1d4ed8; }
 
     .status-badge {
-      display: inline-block; padding: 3px 10px; border-radius: 20px;
-      font-size: 11px; font-weight: 600;
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
     }
+
     .st-open { background: #fee2e2; color: #dc2626; }
     .st-acknowledged { background: #fef3c7; color: #b45309; }
-    .st-investigating { background: #ede9fe; color: #7c3aed; }
-    .st-closed { background: #d1fae5; color: #059669; }
-    .st-dismissed { background: #f3f4f6; color: #6b7280; }
+    .st-investigating { background: #ede9fe; color: #6d28d9; }
+    .st-closed { background: #d1fae5; color: #047857; }
+    .st-dismissed { background: #f3f4f6; color: #4b5563; }
 
     .alert-indicator {
-      display: inline-block; width: 8px; height: 8px;
-      border-radius: 50%; background: #ef4444; margin-right: 4px;
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      margin-right: 4px;
     }
 
-    /* ACTION BUTTONS */
     .action-btn {
-      padding: 4px 10px; border-radius: 6px; font-size: 11px;
-      border: 1px solid #e0e0e0; cursor: pointer; background: #fff;
-      margin-right: 4px; color: #444; font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 7px;
+      font-size: 11px;
+      border: 1px solid #d8dfec;
+      cursor: pointer;
+      background: #fff;
+      margin-right: 4px;
+      color: #36435e;
+      font-weight: 700;
     }
-    .action-btn:hover { background: #f0f0ff; border-color: #7c83fd; color: #7c83fd; }
-    .action-btn.ack { border-color: #10b981; color: #10b981; }
-    .action-btn.dismiss { border-color: #ef4444; color: #ef4444; }
 
-    /* TWO COLUMN LAYOUT */
+    .action-btn:hover { background: #f3f5ff; border-color: #8f97ff; color: #5662d6; }
+    .action-btn.ack { border-color: #10b981; color: #059669; }
+    .action-btn.dismiss { border-color: #ef4444; color: #dc2626; }
+
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .stack-gap { margin-bottom: 20px; }
+    .chart-wrap { padding: 16px 20px 8px; }
+    .chart-grid { display: flex; align-items: flex-end; gap: 10px; height: 100px; }
+    .chart-col { display: flex; flex-direction: column; align-items: center; flex: 1; }
 
-    /* MINI CHART PLACEHOLDER */
-    .chart-placeholder {
-      height: 120px; background: linear-gradient(135deg, #f0f4ff, #e8ecff);
-      border-radius: 8px; display: flex; align-items: center; justify-content: center;
-      color: #aaa; font-size: 13px; margin: 16px;
-    }
-    .chart-bar-container { display: flex; align-items: flex-end; gap: 6px; padding: 16px 20px; height: 100px; }
     .bar {
-      flex: 1; border-radius: 4px 4px 0 0; opacity: 0.85;
-      transition: all 0.3s;
+      width: 100%;
+      border-radius: 6px 6px 0 0;
+      opacity: 0.88;
+      transition: opacity 0.2s ease;
     }
-    .bar:hover { opacity: 1; }
-    .bar-label { text-align: center; font-size: 10px; color: #888; margin-top: 4px; }
 
-    /* ALERT DETAIL PANEL */
+    .bar:hover { opacity: 1; }
+    .bar-label { text-align: center; font-size: 11px; color: #7b859f; margin-top: 4px; }
+    .legend { display: flex; gap: 16px; margin-top: 12px; font-size: 11px; color: #5a6787; font-weight: 700; }
+
     .alert-detail {
-      background: #fff; border-radius: 12px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07); padding: 20px;
+      background: var(--bg-panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
       border-left: 4px solid #ef4444;
     }
-    .alert-detail h3 { font-size: 14px; font-weight: 700; color: #1a1f36; margin-bottom: 12px; }
-    .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
-    .detail-row .key { color: #888; }
-    .detail-row .val { font-weight: 600; color: #333; }
+
+    .alert-detail h3 { font-size: 15px; font-weight: 700; color: #1d2741; margin-bottom: 12px; }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 7px 0;
+      border-bottom: 1px solid #f1f3f8;
+      font-size: 13px;
+    }
+
+    .detail-row .key { color: #7b859f; }
+    .detail-row .val { font-weight: 700; color: #2f3851; }
+    .val-alert { color: #dc2626 !important; }
+
+    .caps-title {
+      margin-top: 12px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #7b859f;
+      letter-spacing: 0.3px;
+    }
+
     .action-group { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
     .action-group .btn { font-size: 12px; padding: 7px 14px; }
     .btn-ack { background: #10b981; color: #fff; }
@@ -170,41 +384,119 @@
     .btn-close { background: #3b82f6; color: #fff; }
     .btn-dismiss { background: #ef4444; color: #fff; }
 
-    /* RULES TABLE */
+    textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #d8dfec;
+      border-radius: 8px;
+      font-size: 13px;
+      height: 60px;
+      resize: none;
+      color: #2f3851;
+    }
+
     .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
     .toggle input { display: none; }
+
     .slider {
-      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-      background: #ccc; border-radius: 20px; transition: 0.3s;
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #c7cfdf;
+      border-radius: 20px;
+      transition: 0.25s;
     }
+
     .slider::before {
-      content: ''; position: absolute; height: 14px; width: 14px;
-      left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s;
+      content: "";
+      position: absolute;
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.25s;
     }
-    .toggle input:checked + .slider { background: #7c83fd; }
+
+    .toggle input:checked + .slider { background: #7481f3; }
     .toggle input:checked + .slider::before { transform: translateX(16px); }
 
-    /* LIFECYCLE */
-    .lifecycle {
-      display: flex; align-items: center; gap: 0; padding: 16px 20px; overflow-x: auto;
-    }
+    .lifecycle { display: flex; align-items: center; gap: 0; padding: 16px 20px; overflow-x: auto; }
+
     .lc-step {
-      display: flex; flex-direction: column; align-items: center;
-      min-width: 100px; font-size: 12px; font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 100px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #4a5677;
     }
+
     .lc-circle {
-      width: 36px; height: 36px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; border: 2px solid #e0e0e0; background: #f8f9fb;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      border: 2px solid #d9e0eb;
+      background: #f6f8fc;
       margin-bottom: 6px;
     }
-    .lc-circle.done { background: #7c83fd; border-color: #7c83fd; color: white; }
+
+    .lc-circle.done { background: #6673e8; border-color: #6673e8; color: #fff; }
     .lc-circle.current { background: #fef3c7; border-color: #f59e0b; }
-    .lc-arrow { font-size: 18px; color: #ccc; margin: 0 -8px; padding-bottom: 22px; }
+    .lc-arrow { font-size: 18px; color: #c2cadb; margin: 0 -8px; padding-bottom: 22px; }
+    .lifecycle-note { padding: 0 20px 16px; font-size: 12px; color: #7b859f; }
 
     .page { display: none; }
     .page.active { display: block; }
-    footer { text-align: center; padding: 20px; font-size: 12px; color: #bbb; }
+
+    .text-danger { color: #dc2626; }
+    .text-warning { color: #b45309; }
+    .text-strong { font-weight: 700; }
+    .text-mini { font-size: 11px; }
+    .ml-auto { margin-left: auto; }
+
+    footer { text-align: center; padding: 20px; font-size: 12px; color: #8f97ac; }
+
+    @media (max-width: 1220px) {
+      .cards,
+      .cards-three,
+      .two-col { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 960px) {
+      .sidebar {
+        width: 86px;
+        padding-top: 18px;
+      }
+
+      .sidebar .logo span,
+      .nav-section,
+      .nav-item .label {
+        display: none;
+      }
+
+      .sidebar .logo { font-size: 16px; padding: 0 0 20px; text-align: center; }
+      .nav-item { justify-content: center; padding: 12px 0; border-left-width: 0; }
+      .nav-item.active { border-left-color: transparent; }
+
+      .main {
+        margin-left: 86px;
+        padding: 20px;
+      }
+
+      .cards,
+      .cards-three,
+      .two-col { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -214,22 +506,22 @@
   <div class="logo">🔍 <span>TxMonitor</span></div>
 
   <div class="nav-section">Main</div>
-  <div class="nav-item active" onclick="showPage('dashboard')">
-    <span class="icon">📊</span> Dashboard
+  <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+    <span class="icon">📊</span> <span class="label">Dashboard</span>
   </div>
-  <div class="nav-item" onclick="showPage('alerts')">
-    <span class="icon">🔔</span> Alerts
-    <span class="badge badge-red" style="margin-left:auto;">7</span>
+  <div class="nav-item" data-page="alerts" onclick="showPage('alerts')">
+    <span class="icon">🔔</span> <span class="label">Alerts</span>
+    <span class="badge badge-red ml-auto">7</span>
   </div>
-  <div class="nav-item" onclick="showPage('transactions')">
-    <span class="icon">💳</span> Transactions
+  <div class="nav-item" data-page="transactions" onclick="showPage('transactions')">
+    <span class="icon">💳</span> <span class="label">Transactions</span>
   </div>
   <div class="nav-section">Config</div>
-  <div class="nav-item" onclick="showPage('rules')">
-    <span class="icon">⚙️</span> Rules
+  <div class="nav-item" data-page="rules" onclick="showPage('rules')">
+    <span class="icon">⚙️</span> <span class="label">Rules</span>
   </div>
-  <div class="nav-item" onclick="showPage('history')">
-    <span class="icon">📜</span> Alert History
+  <div class="nav-item" data-page="history" onclick="showPage('history')">
+    <span class="icon">📜</span> <span class="label">Alert History</span>
   </div>
 </div>
 
@@ -271,43 +563,43 @@
     </div>
 
     <!-- CHART + ALERT DETAIL -->
-    <div class="two-col" style="margin-bottom:20px;">
+    <div class="two-col stack-gap">
       <div class="section">
         <div class="section-header">
           <h2>📈 Alerts by Severity (This Week)</h2>
         </div>
-        <div style="padding: 16px 20px 8px;">
-          <div style="display:flex; align-items:flex-end; gap:10px; height:100px;">
-            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+        <div class="chart-wrap">
+          <div class="chart-grid">
+            <div class="chart-col">
               <div class="bar" style="height:80px;background:#ef4444;width:100%;border-radius:6px 6px 0 0;"></div>
               <div class="bar-label">Mon</div>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+            <div class="chart-col">
               <div class="bar" style="height:50px;background:#f59e0b;width:100%;border-radius:6px 6px 0 0;"></div>
               <div class="bar-label">Tue</div>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+            <div class="chart-col">
               <div class="bar" style="height:65px;background:#ef4444;width:100%;border-radius:6px 6px 0 0;"></div>
               <div class="bar-label">Wed</div>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+            <div class="chart-col">
               <div class="bar" style="height:30px;background:#3b82f6;width:100%;border-radius:6px 6px 0 0;"></div>
               <div class="bar-label">Thu</div>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+            <div class="chart-col">
               <div class="bar" style="height:90px;background:#ef4444;width:100%;border-radius:6px 6px 0 0;"></div>
               <div class="bar-label">Fri</div>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+            <div class="chart-col">
               <div class="bar" style="height:40px;background:#f59e0b;width:100%;border-radius:6px 6px 0 0;"></div>
               <div class="bar-label">Sat</div>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+            <div class="chart-col">
               <div class="bar" style="height:55px;background:#3b82f6;width:100%;border-radius:6px 6px 0 0;"></div>
               <div class="bar-label">Sun</div>
             </div>
           </div>
-          <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;">
+          <div class="legend">
             <span>🔴 HIGH</span><span>🟡 MEDIUM</span><span>🔵 LOW</span>
           </div>
         </div>
@@ -338,7 +630,7 @@
           </div>
           <br/>
         </div>
-        <div style="padding:0 20px 16px;font-size:12px;color:#888;">
+        <div class="lifecycle-note">
           ↳ At any step: can be <span style="color:#6b7280;font-weight:700;">DISMISSED</span> as false positive
         </div>
       </div>
@@ -469,18 +761,18 @@
         <div class="detail-row"><span class="key">Severity</span><span class="val"><span class="severity-badge sev-high">● HIGH</span></span></div>
         <div class="detail-row"><span class="key">Rule Triggered</span><span class="val">Amount Threshold</span></div>
         <div class="detail-row"><span class="key">Account</span><span class="val">ACC-001</span></div>
-        <div class="detail-row"><span class="key">Amount</span><span class="val" style="color:#ef4444;">$15,000.00</span></div>
+        <div class="detail-row"><span class="key">Amount</span><span class="val val-alert">$15,000.00</span></div>
         <div class="detail-row"><span class="key">Payee</span><span class="val">PAYEE-XYZ</span></div>
         <div class="detail-row"><span class="key">Created At</span><span class="val">2026-07-30 09:14:22</span></div>
         <div class="detail-row"><span class="key">Threshold</span><span class="val">$10,000</span></div>
-        <div style="margin-top:12px;font-size:12px;font-weight:700;color:#888;margin-bottom:4px;">RELATED TRANSACTION</div>
+        <div class="caps-title">RELATED TRANSACTION</div>
         <table>
           <thead><tr><th>Txn ID</th><th>Amount</th><th>Time</th></tr></thead>
           <tbody>
-            <tr><td>TXN-8821</td><td style="color:#ef4444;font-weight:700;">$15,000</td><td>09:13:59</td></tr>
+            <tr><td>TXN-8821</td><td class="text-danger text-strong">$15,000</td><td>09:13:59</td></tr>
           </tbody>
         </table>
-        <div style="margin-top:12px;font-size:12px;font-weight:700;color:#888;margin-bottom:4px;">ACTIONS</div>
+        <div class="caps-title">ACTIONS</div>
         <div class="action-group">
           <button class="btn btn-ack" onclick="alert('Alert Acknowledged!')">✓ Acknowledge</button>
           <button class="btn btn-inv" onclick="alert('Marked as Investigating!')">🔍 Investigate</button>
@@ -488,7 +780,7 @@
           <button class="btn btn-dismiss" onclick="alert('Alert Dismissed as False Positive!')">✗ Dismiss</button>
         </div>
         <div style="margin-top:12px;">
-          <textarea placeholder="Add resolution notes here..." style="width:100%;padding:8px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;height:60px;resize:none;"></textarea>
+          <textarea placeholder="Add resolution notes here..."></textarea>
         </div>
       </div>
     </div>
@@ -501,7 +793,7 @@
       <button class="btn btn-primary" onclick="alert('Transaction added!')">+ Add Transaction</button>
     </div>
 
-    <div class="cards" style="grid-template-columns:repeat(3,1fr);">
+    <div class="cards cards-three">
       <div class="card blue">
         <div class="label">Total Transactions</div>
         <div class="value">142</div>
@@ -521,7 +813,7 @@
         <h2>Transaction List</h2>
         <div class="search-bar">
           <input type="text" placeholder="🔍 Search by ID, Account..."/>
-          <input type="date" style="padding:7px;border:1px solid #e0e0e0;border-radius:8px;font-size:12px;"/>
+          <input type="date" class="input-date"/>
           <button class="filter-btn">Amount ▾</button>
         </div>
       </div>
@@ -535,9 +827,9 @@
         <tbody>
           <tr>
             <td>TXN-8821</td><td>ACC-001</td><td>PAYEE-XYZ</td>
-            <td style="font-weight:700;color:#ef4444;">$15,000</td><td>DEBIT</td>
+            <td class="text-strong text-danger">$15,000</td><td>DEBIT</td>
             <td>2026-07-30 09:13</td>
-            <td><span class="alert-indicator"></span><span style="font-size:11px;color:#ef4444;">HIGH Alert</span></td>
+            <td><span class="alert-indicator"></span><span class="text-mini text-danger">HIGH Alert</span></td>
           </tr>
           <tr>
             <td>TXN-8822</td><td>ACC-002</td><td>PAYEE-A</td>
@@ -563,13 +855,13 @@
             <td>TXN-8826</td><td>ACC-002</td><td>PAYEE-A</td>
             <td>$250</td><td>DEBIT</td>
             <td>2026-07-30 10:05</td>
-            <td><span class="alert-indicator"></span><span style="font-size:11px;color:#f59e0b;">MEDIUM Alert (Velocity)</span></td>
+            <td><span class="alert-indicator"></span><span class="text-mini text-warning">MEDIUM Alert (Velocity)</span></td>
           </tr>
           <tr>
             <td>TXN-8827</td><td>ACC-003</td><td>PAYEE-NEW-001</td>
             <td>$5,000</td><td>DEBIT</td>
             <td>2026-07-30 11:29</td>
-            <td><span class="alert-indicator"></span><span style="font-size:11px;color:#f59e0b;">New Payee Alert</span></td>
+            <td><span class="alert-indicator"></span><span class="text-mini text-warning">New Payee Alert</span></td>
           </tr>
           <tr>
             <td>TXN-8828</td><td>ACC-001</td><td>PAYEE-B</td>
@@ -655,7 +947,7 @@
       <div class="section-header">
         <h2>Historical Alerts</h2>
         <div class="search-bar">
-          <input type="date" style="padding:7px;border:1px solid #e0e0e0;border-radius:8px;font-size:12px;"/>
+          <input type="date" class="input-date"/>
           <button class="filter-btn">Status ▾</button>
         </div>
       </div>
@@ -704,7 +996,10 @@
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('page-' + name).classList.add('active');
-    event.currentTarget.classList.add('active');
+    const activeNav = document.querySelector(`.nav-item[data-page="${name}"]`);
+    if (activeNav) {
+      activeNav.classList.add('active');
+    }
   }
 </script>
 </body>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Dashboard — TxMonitor</title>
+    <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <a class="sidebar-brand" href="./dashboard.html">
+            <div class="brand-mark">FB</div>
+            <div class="brand-text">
+                <div class="brand-name">Fraud Busters</div>
+                <div class="brand-sub">Fraud Detection</div>
+            </div>
+        </a>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="nav-group-label">Main</div>
+        <a class="nav-item active" href="./dashboard.html">Dashboard</a>
+        <a class="nav-item" href="./alerts.html">Alerts </a>
+        <a class="nav-item" href="./transactions.html">Transactions</a>
+        <div class="nav-group-label" style="margin-top:10px;">Config</div>
+        <a class="nav-item" href="./rules.html">Rules</a>
+        <a class="nav-item" href="./history.html">Alert History</a>
+    </nav>
+</div>
+
+<div class="main">
+    <div class="topbar">
+        <div>
+            <h1>Dashboard</h1>
+            <div class="sub">Real-time transaction monitoring overview</div>
+        </div>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="cards">
+        <div class="card red">
+            <div class="label">Open Alerts</div>
+            <div class="value" id="open-alerts-value">0</div>
+            <span class="badge badge-red">Needs Attention</span>
+        </div>
+        <div class="card yellow">
+            <div class="label">Acknowledged</div>
+            <div class="value" id="acknowledged-alerts-value">0</div>
+            <span class="badge badge-yellow">In Review</span>
+        </div>
+        <div class="card blue">
+            <div class="label">Transactions Today</div>
+            <div class="value" id="transactions-today-value">0</div>
+            <span class="badge badge-blue">Live from DB</span>
+        </div>
+        <div class="card green">
+            <div class="label">Alerts Closed Today</div>
+            <div class="value" id="closed-alerts-value">0</div>
+            <span class="badge badge-green">Resolved</span>
+        </div>
+    </div>
+
+    <!-- CHART + LIFECYCLE -->
+    <div class="two-col stack-gap">
+        <div class="section">
+            <div class="section-header">
+                <h2>Alerts by Severity — This Week</h2>
+            </div>
+            <div class="chart-wrap">
+                <div class="chart-grid">
+                    <div class="chart-col"><div class="bar" style="height:0px;background:#EF4444;width:100%;"></div><div class="bar-label">Mon</div></div>
+                    <div class="chart-col"><div class="bar" style="height:0px;background:#F59E0B;width:100%;"></div><div class="bar-label">Tue</div></div>
+                    <div class="chart-col"><div class="bar" style="height:0px;background:#EF4444;width:100%;"></div><div class="bar-label">Wed</div></div>
+                    <div class="chart-col"><div class="bar" style="height:0px;background:#3B82F6;width:100%;"></div><div class="bar-label">Thu</div></div>
+                    <div class="chart-col"><div class="bar" style="height:0px;background:#EF4444;width:100%;"></div><div class="bar-label">Fri</div></div>
+                    <div class="chart-col"><div class="bar" style="height:0px;background:#F59E0B;width:100%;"></div><div class="bar-label">Sat</div></div>
+                    <div class="chart-col"><div class="bar" style="height:0px;background:#3B82F6;width:100%;"></div><div class="bar-label">Sun</div></div>
+                </div>
+                <div class="legend">
+                    <span class="legend-item"><span class="legend-swatch" style="background:#EF4444;"></span>High</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#F59E0B;"></span>Medium</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#3B82F6;"></span>Low</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header"><h2>Alert Lifecycle</h2></div>
+            <div class="lifecycle">
+                <div class="lc-step"><div class="lc-circle done">1</div><span>Open</span></div>
+                <div class="lc-arrow">&#8594;</div>
+                <div class="lc-step"><div class="lc-circle current">2</div><span>Acknowledged</span></div>
+                <div class="lc-arrow">&#8594;</div>
+                <div class="lc-step"><div class="lc-circle">3</div><span>Investigating</span></div>
+                <div class="lc-arrow">&#8594;</div>
+                <div class="lc-step"><div class="lc-circle">4</div><span>Closed</span></div>
+            </div>
+            <div class="lifecycle-note">At any step, an alert can be <strong>Dismissed</strong> as a false positive.</div>
+        </div>
+    </div>
+
+    <!-- RECENT ALERTS TABLE -->
+    <div class="section">
+        <div class="section-header">
+            <h2>Recent Open Alerts</h2>
+            <a href="./alerts.html" class="btn btn-primary">View All</a>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>Alert ID</th><th>Severity</th><th>Rule Triggered</th>
+                <th>Account</th><th>Created</th><th>Status</th><th>Actions</th>
+            </tr>
+            </thead>
+            <tbody id="recent-alerts-body">
+            <tr>
+                <td colspan="7" style="color:var(--text-muted);">Loading alerts...</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <footer>TxMonitor MVP &mdash; Transaction Monitoring &amp; Alerts System</footer>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:8081/api";
+
+    function toSeverityClass(severity) {
+      if (severity === "HIGH" || severity === "CRITICAL") return "sev-high";
+      if (severity === "MEDIUM") return "sev-medium";
+      return "sev-low";
+    }
+
+    function toStatusClass(status) {
+      if (status === "OPEN") return "st-open";
+      if (status === "ACKNOWLEDGED") return "st-acknowledged";
+      if (status === "INVESTIGATING") return "st-investigating";
+      if (status === "CLOSED") return "st-closed";
+      return "st-dismissed";
+    }
+
+    function prettyStatus(status) {
+      return (status || "").replaceAll("_", " ").toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+    }
+
+    async function loadSummary() {
+      const response = await fetch(`${API_BASE}/dashboard/summary`);
+      if (!response.ok) {
+        throw new Error("Failed to load dashboard summary");
+      }
+      const data = await response.json();
+      document.getElementById("open-alerts-value").textContent = data.openAlerts ?? 0;
+      document.getElementById("acknowledged-alerts-value").textContent = data.acknowledgedAlerts ?? 0;
+      document.getElementById("transactions-today-value").textContent = data.transactionsToday ?? 0;
+      document.getElementById("closed-alerts-value").textContent = data.closedToday ?? 0;
+    }
+
+    async function loadRecentAlerts() {
+      const tbody = document.getElementById("recent-alerts-body");
+      const response = await fetch(`${API_BASE}/dashboard/recent-alerts`);
+      if (!response.ok) {
+        throw new Error("Failed to load recent alerts");
+      }
+
+      const alerts = await response.json();
+      if (!alerts || alerts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted);">No recent open alerts found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = alerts.map(alert => {
+        const severity = (alert.severity || "LOW").toUpperCase();
+        const status = (alert.status || "OPEN").toUpperCase();
+        const created = alert.createdAt ? new Date(alert.createdAt).toLocaleString() : "-";
+        return `
+          <tr>
+            <td>${alert.alertCode ?? "-"}</td>
+            <td><span class="severity-badge ${toSeverityClass(severity)}">${prettyStatus(severity)}</span></td>
+            <td>${alert.ruleName ?? "-"}</td>
+            <td>-</td>
+            <td>${created}</td>
+            <td><span class="status-badge ${toStatusClass(status)}">${prettyStatus(status)}</span></td>
+            <td style="color:var(--text-muted);">Live</td>
+          </tr>`;
+      }).join("");
+    }
+
+    async function initDashboard() {
+      try {
+        await Promise.all([loadSummary(), loadRecentAlerts()]);
+      } catch (error) {
+        console.error(error);
+        document.getElementById("recent-alerts-body").innerHTML =
+          `<tr><td colspan="7" style="color:#B91C1C;">Could not load live data. Check backend API at ${API_BASE}.</td></tr>`;
+      }
+    }
+
+    initDashboard();
+</script>
+</body>
+</html>
+

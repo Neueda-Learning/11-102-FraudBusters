@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Transactions - TxMonitor</title>
+    <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <a class="sidebar-brand" href="./dashboard.html">
+            <div class="brand-mark">FB</div>
+            <div class="brand-text">
+                <div class="brand-name">Fraud Busters</div>
+                <div class="brand-sub">Fraud Detection</div>
+            </div>
+        </a>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="nav-group-label">Main</div>
+        <a class="nav-item" href="./dashboard.html">Dashboard</a>
+        <a class="nav-item" href="./alerts.html">Alerts </a>
+        <a class="nav-item active" href="./transactions.html">Transactions</a>
+        <div class="nav-group-label" style="margin-top:10px;">Config</div>
+        <a class="nav-item" href="./rules.html">Rules</a>
+        <a class="nav-item" href="./history.html">Alert History</a>
+    </nav>
+</div>
+
+<div class="main">
+    <div class="topbar">
+        <div>
+            <h1>Transactions</h1>
+            <div class="sub">Live transactions from FraudBustersDB</div>
+        </div>
+        <button class="btn btn-primary" type="button" onclick="alert('Create transaction endpoint can be added next.')">+ Add Transaction</button>
+    </div>
+
+    <div class="cards cards-three">
+        <div class="card blue">
+            <div class="label">Total Transactions</div>
+            <div class="value" id="total-transactions-value">0</div>
+        </div>
+        <div class="card green">
+            <div class="label">Total Volume</div>
+            <div class="value" id="total-volume-value">$0</div>
+        </div>
+        <div class="card red">
+            <div class="label">Alerts Triggered</div>
+            <div class="value" id="alerts-triggered-value">0</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2>Transaction List</h2>
+            <div class="search-bar">
+                <label class="sr-only" for="txn-search">Search transactions</label>
+                <input id="txn-search" type="text" placeholder="Search by ID, Account..."/>
+                <label class="sr-only" for="txn-date">Filter by date</label>
+                <input id="txn-date" type="date" class="input-date"/>
+                <button class="filter-btn" type="button">Amount</button>
+            </div>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>Txn ID</th><th>Account</th><th>Payee</th>
+                <th>Amount</th><th>Type</th><th>Timestamp</th><th>Alert</th>
+            </tr>
+            </thead>
+            <tbody id="txn-body">
+            <tr><td colspan="7" style="color:var(--text-muted);">Loading transactions...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <footer>TxMonitor MVP &mdash; Transaction Monitoring &amp; Alerts System</footer>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:8081/api";
+    let transactionsData = [];
+
+    function toSentence(value) {
+      return (value || "").toLowerCase().replace(/(^|\s)\S/g, function (m) { return m.toUpperCase(); });
+    }
+
+    function toSeverityClass(severity) {
+      if (severity === "HIGH" || severity === "CRITICAL") return "sev-high";
+      if (severity === "MEDIUM") return "sev-medium";
+      return "sev-low";
+    }
+
+    function formatDate(value) {
+      if (!value) return "-";
+      return new Date(value).toLocaleString();
+    }
+
+    function renderTransactions() {
+      const tbody = document.getElementById("txn-body");
+      const search = (document.getElementById("txn-search").value || "").toLowerCase();
+      const dateFilter = document.getElementById("txn-date").value || "";
+
+      const rows = transactionsData.filter(function (t) {
+        const text = [t.txnId, t.accountId, t.payeeId, t.txnType].join(" ").toLowerCase();
+        const matchText = !search || text.includes(search);
+        const timestamp = t.txnTimestamp ? new Date(t.txnTimestamp).toISOString().slice(0, 10) : "";
+        const matchDate = !dateFilter || timestamp === dateFilter;
+        return matchText && matchDate;
+      });
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted);">No transactions found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(function (t) {
+        const alertCell = t.hasAlert
+          ? `<span class="alert-indicator"></span><span class="text-mini ${t.alertSeverity === "HIGH" || t.alertSeverity === "CRITICAL" ? "text-danger" : "text-warning"}">${t.alertLabel || "Alert"}</span>`
+          : `<span style="color:var(--text-muted);">-</span>`;
+
+        return `
+          <tr>
+            <td>${t.txnId || "-"}</td>
+            <td>${t.accountId || "-"}</td>
+            <td>${t.payeeId || "-"}</td>
+            <td class="${t.hasAlert ? "text-strong text-danger" : ""}">${t.amount || "-"}</td>
+            <td>${toSentence(t.txnType || "")}</td>
+            <td>${formatDate(t.txnTimestamp)}</td>
+            <td>${alertCell}</td>
+          </tr>`;
+      }).join("");
+    }
+
+    async function loadTransactions() {
+      const response = await fetch(`${API_BASE}/transactions`);
+      if (!response.ok) throw new Error("Failed to load transactions from API");
+
+      const data = await response.json();
+      transactionsData = data.transactions || [];
+
+      document.getElementById("total-transactions-value").textContent = data.totalTransactions ?? 0;
+      document.getElementById("total-volume-value").textContent = data.totalVolume ?? "$0";
+      document.getElementById("alerts-triggered-value").textContent = data.alertsTriggered ?? 0;
+
+      renderTransactions();
+    }
+
+    document.getElementById("txn-search").addEventListener("input", renderTransactions);
+    document.getElementById("txn-date").addEventListener("change", renderTransactions);
+
+    loadTransactions().catch(function (error) {
+      console.error(error);
+      document.getElementById("txn-body").innerHTML =
+        `<tr><td colspan="7" style="color:#B91C1C;">Could not load transactions. Check backend API at ${API_BASE}.</td></tr>`;
+    });
+</script>
+</body>
+</html>
