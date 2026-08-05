@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Alert History -Fraud Buster</title>
+    <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <a class="sidebar-brand" href="./dashboard.html">
+            <div class="brand-mark">FB</div>
+            <div class="brand-text">
+                <div class="brand-name">Fraud Busters</div>
+                <div class="brand-sub">Fraud Detection</div>
+            </div>
+        </a>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="nav-group-label">Main</div>
+        <a class="nav-item" href="./dashboard.html">Dashboard</a>
+        <a class="nav-item" href="./alerts.html">Alerts </a>
+        <a class="nav-item" href="./transactions.html">Transactions</a>
+        <div class="nav-group-label" style="margin-top:10px;">Config</div>
+        <a class="nav-item" href="./rules.html">Rules</a>
+        <a class="nav-item active" href="./history.html">Alert History</a>
+    </nav>
+</div>
+
+<div class="main">
+    <div class="topbar">
+        <div>
+            <h1>Alert History</h1>
+            <div class="sub">Closed and dismissed alerts from FraudBustersDB</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2>Historical Alerts</h2>
+            <div class="search-bar">
+                <label class="sr-only" for="history-date">Filter by date</label>
+                <input id="history-date" type="date" class="input-date"/>
+                <button id="history-reset" class="filter-btn" type="button">Reset</button>
+            </div>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>Alert ID</th><th>Severity</th><th>Rule</th>
+                <th>Opened At</th><th>Closed At</th><th>Final Status</th><th>Notes</th>
+            </tr>
+            </thead>
+            <tbody id="history-body">
+            <tr><td colspan="7" style="color:var(--text-muted);">Loading history...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <footer>TxMonitor MVP &mdash; Transaction Monitoring &amp; Alerts System</footer>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:8082/api";
+    let historyRows = [];
+
+    function toSentence(value) {
+      return (value || "").toLowerCase().replace(/(^|\s)\S/g, function (m) { return m.toUpperCase(); });
+    }
+
+    function formatDate(value) {
+      if (!value) return "-";
+      return new Date(value).toLocaleString();
+    }
+
+    function renderHistory() {
+      const tbody = document.getElementById("history-body");
+      const dateFilter = document.getElementById("history-date").value || "";
+
+      const rows = historyRows.filter(function (r) {
+        if (!dateFilter) return true;
+        const closedDate = r.closedAt ? new Date(r.closedAt).toISOString().slice(0, 10) : "";
+        return closedDate === dateFilter;
+      });
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted);">No historical alerts found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(function (r) {
+        return `
+          <tr>
+            <td>${r.alertCode || "-"}</td>
+            <td><span class="severity-badge ${r.severityClass || "sev-low"}">${toSentence(r.severity || "LOW")}</span></td>
+            <td>${r.ruleName || "-"}</td>
+            <td>${formatDate(r.openedAt)}</td>
+            <td>${formatDate(r.closedAt)}</td>
+            <td><span class="status-badge ${r.finalStatusClass || "st-dismissed"}">${toSentence(r.finalStatus || "-")}</span></td>
+            <td>${r.notes || "-"}</td>
+          </tr>`;
+      }).join("");
+    }
+
+    async function loadHistory() {
+      const response = await fetch(`${API_BASE}/alerts/history`);
+      if (!response.ok) throw new Error("Failed to load alert history from API");
+
+      const data = await response.json();
+      historyRows = data.history || [];
+      renderHistory();
+    }
+
+    document.getElementById("history-date").addEventListener("change", renderHistory);
+    document.getElementById("history-reset").addEventListener("click", function () {
+      document.getElementById("history-date").value = "";
+      renderHistory();
+    });
+
+    loadHistory().catch(function (error) {
+      console.error(error);
+      document.getElementById("history-body").innerHTML =
+        `<tr><td colspan="7" style="color:#B91C1C;">Could not load history. Check backend API at ${API_BASE}.</td></tr>`;
+    });
+</script>
+</body>
+</html>
