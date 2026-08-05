@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Monitoring Rules — TxMonitor</title>
+    <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <a class="sidebar-brand" href="./dashboard.html">
+            <div class="brand-mark">FB</div>
+            <div class="brand-text">
+                <div class="brand-name">Fraud Busters</div>
+                <div class="brand-sub">Fraud Detection</div>
+            </div>
+        </a>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="nav-group-label">Main</div>
+        <a class="nav-item" href="./dashboard.html">Dashboard</a>
+        <a class="nav-item" href="./alerts.html">Alerts </a>
+        <a class="nav-item" href="./transactions.html">Transactions</a>
+        <div class="nav-group-label" style="margin-top:10px;">Config</div>
+        <a class="nav-item active" href="./rules.html">Rules</a>
+        <a class="nav-item" href="./history.html">Alert History</a>
+    </nav>
+</div>
+
+<div class="main">
+    <div class="topbar">
+        <div>
+            <h1>Monitoring Rules</h1>
+            <div class="sub">Review DB-driven rule definitions and thresholds</div>
+        </div>
+    </div>
+
+    <div class="cards cards-three">
+        <div class="card blue">
+            <div class="label">Rules Configured</div>
+            <div class="value" id="rules-total-value">0</div>
+            <span class="badge badge-blue">Total</span>
+        </div>
+        <div class="card green">
+            <div class="label">Active Rules</div>
+            <div class="value" id="rules-active-value">0</div>
+            <span class="badge badge-green">Monitoring</span>
+        </div>
+        <div class="card yellow">
+            <div class="label">Inactive Rules</div>
+            <div class="value" id="rules-inactive-value">0</div>
+            <span class="badge badge-yellow">Pending Review</span>
+        </div>
+    </div>
+
+    <div id="rules-list">
+        <div class="rule-card sev-border-low">
+            <div>
+                <h3 style="font-size:20px;margin-bottom:10px;">Loading rule...</h3>
+                <p class="rule-desc">Loading rules from database...</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>TxMonitor MVP &mdash; Transaction Monitoring &amp; Alerts System</footer>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:8082/api";
+
+    function toSentenceCase(text) {
+      return (text || "").toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+    }
+
+    function toCardBorderClass(severityClass) {
+      if (severityClass === "sev-high") return "sev-border-high";
+      if (severityClass === "sev-medium") return "sev-border-medium";
+      return "sev-border-low";
+    }
+
+    function withDailyLimitOverride(rule) {
+      const name = (rule.name || "").toLowerCase();
+      if (name.includes("daily limit")) {
+        return {
+          ...rule,
+          severity: "LOW",
+          severityClass: "sev-low"
+        };
+      }
+      return rule;
+    }
+
+    async function loadRules() {
+      const response = await fetch(`${API_BASE}/rules`);
+      if (!response.ok) {
+        throw new Error("Failed to load rules from API");
+      }
+
+      const data = await response.json();
+      document.getElementById("rules-total-value").textContent = data.totalRules ?? 0;
+      document.getElementById("rules-active-value").textContent = data.activeRules ?? 0;
+      document.getElementById("rules-inactive-value").textContent = data.inactiveRules ?? 0;
+
+      const rulesList = document.getElementById("rules-list");
+      const rules = data.rules || [];
+
+      if (rules.length === 0) {
+        rulesList.innerHTML = `<div class="rule-card sev-border-low"><div><p class="rule-desc">No rules found in the database.</p></div></div>`;
+        return;
+      }
+
+      rulesList.innerHTML = rules.map(rule => {
+        const r = withDailyLimitOverride(rule);
+        return `
+        <div class="rule-card ${toCardBorderClass(r.severityClass)}">
+          <div>
+            <h3 style="font-size:20px;margin-bottom:10px;">${r.name ?? "Rule"}</h3>
+            <p class="rule-desc">${r.description ?? "Rule definition loaded from database."}</p>
+            <div class="rule-meta">
+              <div class="rule-meta-item"><span class="meta-key">Parameter</span><span class="meta-val">${r.parameter ?? "Configured in DB"}</span></div>
+              <div class="rule-meta-item"><span class="meta-key">Severity</span><span class="meta-val"><span class="severity-badge ${r.severityClass}">${toSentenceCase(r.severity)}</span></span></div>
+            </div>
+          </div>
+        </div>
+      `;
+      }).join("");
+    }
+
+    loadRules().catch(error => {
+      console.error(error);
+      document.getElementById("rules-list").innerHTML =
+        `<div class="rule-card sev-border-high"><div><p class="rule-desc" style="color:#B91C1C;">Could not load rules. Check backend API at ${API_BASE}.</p></div></div>`;
+    });
+</script>
+</body>
+</html>
