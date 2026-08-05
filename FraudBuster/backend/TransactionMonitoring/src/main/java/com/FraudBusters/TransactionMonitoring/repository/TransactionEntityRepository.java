@@ -15,6 +15,12 @@ public interface TransactionEntityRepository extends JpaRepository<TransactionEn
     Optional<TransactionEntity> findByTxnId(String txnId);
 
     /**
+     * Check whether this account has already used the same payee in a previous transaction.
+     * Excludes the current txnId so the current in-flight row does not count as history.
+     */
+    boolean existsByAccountIdAndPayeeIdAndTxnIdNot(String accountId, String payeeId, String txnId);
+
+    /**
      * Fetch all DEBIT transactions for an account within a time window.
      * Used by the DAILY_LIMIT rule to sum up the day's spend.
      */
