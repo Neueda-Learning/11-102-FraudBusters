@@ -82,6 +82,7 @@
 
 <script>
     const API_BASE = "http://localhost:8082/api";
+    const TRANSACTIONS_API = `${API_BASE.replace(/\/$/, "")}/transactions`;
     let transactionsData = [];
 
     function toSentence(value) {
@@ -90,7 +91,8 @@
 
     function formatDate(value) {
       if (!value) return "-";
-      return new Date(value).toLocaleString();
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
     }
 
     function formatAmount(value, currency) {
@@ -143,7 +145,7 @@
     }
 
     async function loadTransactions() {
-      const response = await fetch(`${API_BASE}/transactions`);
+      const response = await fetch(TRANSACTIONS_API);
       if (!response.ok) throw new Error("Failed to load transactions from API");
 
       const data = await response.json();
@@ -175,7 +177,7 @@
     loadTransactions().catch(function (error) {
       console.error(error);
       document.getElementById("txn-body").innerHTML =
-        `<tr><td colspan="9" style="color:#B91C1C;">Could not load transactions. Check backend API at ${API_BASE}.</td></tr>`;
+        `<tr><td colspan="9" style="color:#B91C1C;">Could not load transactions. Check backend API at ${TRANSACTIONS_API}.</td></tr>`;
     });
 </script>
 </body>

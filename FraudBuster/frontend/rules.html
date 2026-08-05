@@ -37,6 +37,8 @@
         </div>
     </div>
 
+    <div id="rules-feedback" class="rules-feedback hidden" aria-live="polite"></div>
+
     <div class="cards cards-three">
         <div class="card blue">
             <div class="label">Rules Configured</div>
@@ -67,11 +69,54 @@
     <footer>TxMonitor MVP &mdash; Transaction Monitoring &amp; Alerts System</footer>
 </div>
 
+<div id="password-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
+    <div class="modal-card">
+        <h2 id="password-modal-title">Operator Verification</h2>
+        <p class="modal-copy">Enter the operator password to unlock this rule for editing.</p>
+        <label class="rule-field" for="operator-password-input">
+            <span>Password</span>
+            <input id="operator-password-input" class="rule-input" type="password" placeholder="Enter operator password" />
+        </label>
+        <div id="password-error" class="modal-error hidden">Incorrect password. Please try again.</div>
+        <div class="modal-actions">
+            <button id="password-cancel-btn" class="btn btn-secondary" type="button">Cancel</button>
+            <button id="password-confirm-btn" class="btn btn-primary" type="button">Verify &amp; Continue</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const API_BASE = "http://localhost:8082/api";
+    const SAMPLE_OPERATOR_PASSWORD = "123";
+
+    let rulesData = [];
+    let editingRuleCode = null;
+    let pendingRuleCode = null;
+    let verifiedOperatorPassword = null;
+
+    const rulesList = document.getElementById("rules-list");
+    const feedbackBox = document.getElementById("rules-feedback");
+    const passwordModal = document.getElementById("password-modal");
+    const passwordInput = document.getElementById("operator-password-input");
+    const passwordError = document.getElementById("password-error");
 
     function toSentenceCase(text) {
       return (text || "").toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+    }
+
+    function escapeHtml(text) {
+      return String(text ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function toSeverityClass(severity) {
+      if (severity === "HIGH" || severity === "CRITICAL") return "sev-high";
+      if (severity === "MEDIUM") return "sev-medium";
+      return "sev-low";
     }
 
     function toCardBorderClass(severityClass) {
@@ -80,16 +125,246 @@
       return "sev-border-low";
     }
 
-    function withDailyLimitOverride(rule) {
-      const name = (rule.name || "").toLowerCase();
-      if (name.includes("daily limit")) {
-        return {
-          ...rule,
-          severity: "LOW",
-          severityClass: "sev-low"
-        };
+    function normalizeRule(rule) {
+      const severity = (rule.severity || "LOW").toUpperCase();
+      return {
+        ...rule,
+        name: rule.name || "Rule",
+        description: rule.description || "",
+        parameter: rule.parameter || "",
+        severity,
+        severityClass: rule.severityClass || toSeverityClass(severity),
+        isActive: rule.isActive !== false
+      };
+    }
+
+    function updateRuleCards() {
+      const totalRules = rulesData.length;
+      const activeRules = rulesData.filter(rule => rule.isActive).length;
+
+      document.getElementById("rules-total-value").textContent = totalRules;
+      document.getElementById("rules-active-value").textContent = activeRules;
+      document.getElementById("rules-inactive-value").textContent = totalRules - activeRules;
+    }
+
+    function showFeedback(message, type) {
+      feedbackBox.textContent = message;
+      feedbackBox.className = `rules-feedback ${type}`;
+    }
+
+    function hideFeedback() {
+      feedbackBox.textContent = "";
+      feedbackBox.className = "rules-feedback hidden";
+    }
+
+    function openPasswordModal(ruleCode) {
+      pendingRuleCode = ruleCode;
+      passwordInput.value = "";
+      passwordError.classList.add("hidden");
+      passwordModal.classList.remove("hidden");
+      window.setTimeout(() => passwordInput.focus(), 0);
+    }
+
+    function closePasswordModal() {
+      pendingRuleCode = null;
+      passwordInput.value = "";
+      passwordError.classList.add("hidden");
+      passwordModal.classList.add("hidden");
+    }
+
+    function renderRuleCard(rule) {
+      const borderClass = toCardBorderClass(rule.severityClass);
+      const statusBadgeClass = rule.isActive ? "badge-green" : "badge-yellow";
+      const statusLabel = rule.isActive ? "Active" : "Inactive";
+      const description = rule.description || "Rule definition loaded from database.";
+      const parameter = rule.parameter || "Configured in DB";
+
+      return `
+        <div class="rule-card ${borderClass}" data-rule-card="${escapeHtml(rule.ruleCode)}">
+          <div class="rule-card-body">
+            <div class="rule-card-header">
+              <h3>${escapeHtml(rule.name)}</h3>
+              <span class="rule-type-tag">${escapeHtml(rule.ruleCode || "RULE")}</span>
+              <span class="badge ${statusBadgeClass}">${statusLabel}</span>
+            </div>
+            <p class="rule-desc">${escapeHtml(description)}</p>
+            <div class="rule-meta">
+              <div class="rule-meta-item">
+                <span class="meta-key">Parameter</span>
+                <span class="meta-val rule-parameter-block">${escapeHtml(parameter)}</span>
+              </div>
+              <div class="rule-meta-item">
+                <span class="meta-key">Severity</span>
+                <span class="meta-val"><span class="severity-badge ${rule.severityClass}">${toSentenceCase(rule.severity)}</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="rule-card-actions">
+            <button class="btn btn-primary" type="button" data-configure-rule="${escapeHtml(rule.ruleCode)}">Configure</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderEditableRuleCard(rule) {
+      const borderClass = toCardBorderClass(rule.severityClass);
+
+      return `
+        <div class="rule-card ${borderClass} rule-card-editing" data-rule-card="${escapeHtml(rule.ruleCode)}">
+          <div class="rule-card-body">
+            <div class="rule-card-header">
+              <h3>${escapeHtml(rule.name)}</h3>
+              <span class="rule-type-tag">${escapeHtml(rule.ruleCode || "RULE")}</span>
+              <span class="db-badge">UI Demo Mode</span>
+            </div>
+            <div class="rule-edit-grid">
+              <label class="rule-field">
+                <span>Description</span>
+                <textarea data-edit-field="description" placeholder="Describe what this rule does...">${escapeHtml(rule.description)}</textarea>
+              </label>
+              <label class="rule-field">
+                <span>Parameter / Threshold</span>
+                <textarea data-edit-field="parameter" placeholder="Enter threshold, JSON, or rule parameter...">${escapeHtml(rule.parameter)}</textarea>
+              </label>
+              <label class="rule-field">
+                <span>Severity</span>
+                <select class="rule-select" data-edit-field="severity">
+                  <option value="LOW" ${rule.severity === "LOW" ? "selected" : ""}>Low</option>
+                  <option value="MEDIUM" ${rule.severity === "MEDIUM" ? "selected" : ""}>Medium</option>
+                  <option value="HIGH" ${rule.severity === "HIGH" ? "selected" : ""}>High</option>
+                  <option value="CRITICAL" ${rule.severity === "CRITICAL" ? "selected" : ""}>Critical</option>
+                </select>
+              </label>
+              <label class="rule-field rule-field-inline">
+                <span>Monitoring Status</span>
+                <div class="rule-toggle-row">
+                  <label class="toggle">
+                    <input type="checkbox" data-edit-field="isActive" ${rule.isActive ? "checked" : ""} />
+                    <span class="slider"></span>
+                  </label>
+                  <span class="rule-toggle-label">${rule.isActive ? "Active" : "Inactive"}</span>
+                </div>
+              </label>
+            </div>
+          </div>
+          <div class="rule-card-actions">
+            <button class="btn btn-primary" type="button" data-save-rule="${escapeHtml(rule.ruleCode)}">Save</button>
+            <button class="btn btn-secondary" type="button" data-cancel-rule="${escapeHtml(rule.ruleCode)}">Cancel</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderRules() {
+      if (rulesData.length === 0) {
+        rulesList.innerHTML = `<div class="rule-card sev-border-low"><div><p class="rule-desc">No rules found in the database.</p></div></div>`;
+        return;
       }
-      return rule;
+
+      rulesList.innerHTML = rulesData.map(rule => {
+        if (editingRuleCode === rule.ruleCode) {
+          return renderEditableRuleCard(rule);
+        }
+        return renderRuleCard(rule);
+      }).join("");
+
+      attachRuleEvents();
+    }
+
+    function attachRuleEvents() {
+      Array.from(document.querySelectorAll("[data-configure-rule]")).forEach(button => {
+        button.addEventListener("click", function () {
+          const ruleCode = button.getAttribute("data-configure-rule");
+          if (editingRuleCode && editingRuleCode !== ruleCode) {
+            const discard = window.confirm("You have unsaved changes on another rule. Discard them and continue?");
+            if (!discard) return;
+          }
+          editingRuleCode = null;
+          hideFeedback();
+          openPasswordModal(ruleCode);
+        });
+      });
+
+      Array.from(document.querySelectorAll("[data-cancel-rule]")).forEach(button => {
+        button.addEventListener("click", function () {
+          editingRuleCode = null;
+          showFeedback("Rule configuration cancelled.", "info");
+          renderRules();
+        });
+      });
+
+      Array.from(document.querySelectorAll("[data-save-rule]")).forEach(button => {
+        button.addEventListener("click", function () {
+          const ruleCode = button.getAttribute("data-save-rule");
+          saveRuleChanges(ruleCode);
+        });
+      });
+
+      Array.from(document.querySelectorAll('[data-edit-field="isActive"]')).forEach(toggle => {
+        toggle.addEventListener("change", function () {
+          const label = toggle.closest(".rule-toggle-row")?.querySelector(".rule-toggle-label");
+          if (label) {
+            label.textContent = toggle.checked ? "Active" : "Inactive";
+          }
+        });
+      });
+    }
+
+    async function saveRuleChanges(ruleCode) {
+      const safeRuleCode = window.CSS && window.CSS.escape ? window.CSS.escape(ruleCode) : ruleCode.replace(/"/g, '\\"');
+      const card = document.querySelector(`[data-rule-card="${safeRuleCode}"]`);
+      if (!card) return;
+
+      const description = card.querySelector('[data-edit-field="description"]').value.trim();
+      const parameter = card.querySelector('[data-edit-field="parameter"]').value.trim();
+      const severity = card.querySelector('[data-edit-field="severity"]').value;
+      const isActive = card.querySelector('[data-edit-field="isActive"]').checked;
+
+      const payload = {
+        description: description || null,
+        configJson: parameter,
+        severityDefault: severity,
+        isActive: isActive
+      };
+
+      try {
+        const response = await fetch(`${API_BASE}/rules/${encodeURIComponent(ruleCode)}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Operator-Password": verifiedOperatorPassword || ""
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          showFeedback(`Failed to save rule. Status: ${response.status}. Check backend API.`, "error");
+          return;
+        }
+
+        editingRuleCode = null;
+        showFeedback("Rule saved successfully to database!", "success");
+        await loadRules();
+      } catch (error) {
+        console.error(error);
+        showFeedback(`Error saving rule: ${error.message}`, "error");
+      }
+    }
+
+    function verifyPassword() {
+      const enteredPassword = passwordInput.value;
+      if (enteredPassword !== SAMPLE_OPERATOR_PASSWORD) {
+        passwordError.classList.remove("hidden");
+        passwordInput.focus();
+        passwordInput.select();
+        return;
+      }
+
+      editingRuleCode = pendingRuleCode;
+      verifiedOperatorPassword = enteredPassword;
+      closePasswordModal();
+      hideFeedback();
+      renderRules();
     }
 
     async function loadRules() {
@@ -99,39 +374,31 @@
       }
 
       const data = await response.json();
-      document.getElementById("rules-total-value").textContent = data.totalRules ?? 0;
-      document.getElementById("rules-active-value").textContent = data.activeRules ?? 0;
-      document.getElementById("rules-inactive-value").textContent = data.inactiveRules ?? 0;
-
-      const rulesList = document.getElementById("rules-list");
-      const rules = data.rules || [];
-
-      if (rules.length === 0) {
-        rulesList.innerHTML = `<div class="rule-card sev-border-low"><div><p class="rule-desc">No rules found in the database.</p></div></div>`;
-        return;
-      }
-
-      rulesList.innerHTML = rules.map(rule => {
-        const r = withDailyLimitOverride(rule);
-        return `
-        <div class="rule-card ${toCardBorderClass(r.severityClass)}">
-          <div>
-            <h3 style="font-size:20px;margin-bottom:10px;">${r.name ?? "Rule"}</h3>
-            <p class="rule-desc">${r.description ?? "Rule definition loaded from database."}</p>
-            <div class="rule-meta">
-              <div class="rule-meta-item"><span class="meta-key">Parameter</span><span class="meta-val">${r.parameter ?? "Configured in DB"}</span></div>
-              <div class="rule-meta-item"><span class="meta-key">Severity</span><span class="meta-val"><span class="severity-badge ${r.severityClass}">${toSentenceCase(r.severity)}</span></span></div>
-            </div>
-          </div>
-        </div>
-      `;
-      }).join("");
+      rulesData = (data.rules || []).map(normalizeRule);
+      updateRuleCards();
+      renderRules();
     }
+
+    document.getElementById("password-confirm-btn").addEventListener("click", verifyPassword);
+    document.getElementById("password-cancel-btn").addEventListener("click", closePasswordModal);
+    passwordInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        verifyPassword();
+      }
+    });
+    passwordModal.addEventListener("click", function (event) {
+      if (event.target === passwordModal) {
+        verifiedOperatorPassword = null;
+        closePasswordModal();
+      }
+    });
 
     loadRules().catch(error => {
       console.error(error);
       document.getElementById("rules-list").innerHTML =
         `<div class="rule-card sev-border-high"><div><p class="rule-desc" style="color:#B91C1C;">Could not load rules. Check backend API at ${API_BASE}.</p></div></div>`;
+      showFeedback("Rules page is still in UI mode, but live rule loading failed. Start the backend API to see current data.", "error");
     });
 </script>
 </body>
