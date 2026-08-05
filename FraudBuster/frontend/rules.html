@@ -92,6 +92,7 @@
     let rulesData = [];
     let editingRuleCode = null;
     let pendingRuleCode = null;
+    let verifiedOperatorPassword = null;
 
     const rulesList = document.getElementById("rules-list");
     const feedbackBox = document.getElementById("rules-feedback");
@@ -309,7 +310,7 @@
       });
     }
 
-    function saveRuleChanges(ruleCode) {
+    async function saveRuleChanges(ruleCode) {
       const safeRuleCode = window.CSS && window.CSS.escape ? window.CSS.escape(ruleCode) : ruleCode.replace(/"/g, '\\"');
       const card = document.querySelector(`[data-rule-card="${safeRuleCode}"]`);
       if (!card) return;
@@ -319,22 +320,35 @@
       const severity = card.querySelector('[data-edit-field="severity"]').value;
       const isActive = card.querySelector('[data-edit-field="isActive"]').checked;
 
-      rulesData = rulesData.map(rule => {
-        if (rule.ruleCode !== ruleCode) return rule;
-        return {
-          ...rule,
-          description,
-          parameter,
-          severity,
-          severityClass: toSeverityClass(severity),
-          isActive
-        };
-      });
+      const payload = {
+        description: description || null,
+        configJson: parameter,
+        severityDefault: severity,
+        isActive: isActive
+      };
 
-      editingRuleCode = null;
-      updateRuleCards();
-      renderRules();
-      showFeedback("Rule updated in UI demo mode. Changes are stored only for this page session.", "success");
+      try {
+        const response = await fetch(`${API_BASE}/rules/${encodeURIComponent(ruleCode)}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Operator-Password": verifiedOperatorPassword || ""
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          showFeedback(`Failed to save rule. Status: ${response.status}. Check backend API.`, "error");
+          return;
+        }
+
+        editingRuleCode = null;
+        showFeedback("Rule saved successfully to database!", "success");
+        await loadRules();
+      } catch (error) {
+        console.error(error);
+        showFeedback(`Error saving rule: ${error.message}`, "error");
+      }
     }
 
     function verifyPassword() {
@@ -347,6 +361,7 @@
       }
 
       editingRuleCode = pendingRuleCode;
+      verifiedOperatorPassword = enteredPassword;
       closePasswordModal();
       hideFeedback();
       renderRules();
@@ -374,6 +389,7 @@
     });
     passwordModal.addEventListener("click", function (event) {
       if (event.target === passwordModal) {
+        verifiedOperatorPassword = null;
         closePasswordModal();
       }
     });
