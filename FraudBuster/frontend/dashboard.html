@@ -55,7 +55,7 @@
             <span class="badge badge-blue">Live from DB</span>
         </div>
         <div class="card green">
-            <div class="label">Alerts Closed Today</div>
+            <div class="label">Alerts Resolved Today</div>
             <div class="value" id="closed-alerts-value">0</div>
             <span class="badge badge-green">Resolved</span>
         </div>
@@ -179,7 +179,7 @@
             <td>${alert.alertCode ?? "-"}</td>
             <td><span class="severity-badge ${toSeverityClass(severity)}">${prettyStatus(severity)}</span></td>
             <td>${alert.ruleName ?? "-"}</td>
-            <td>-</td>
+            <td>${alert.accountId && String(alert.accountId).trim() ? alert.accountId : "-"}</td>
             <td>${created}</td>
             <td><span class="status-badge ${toStatusClass(status)}">${prettyStatus(status)}</span></td>
             <td style="color:var(--text-muted);">Live</td>
