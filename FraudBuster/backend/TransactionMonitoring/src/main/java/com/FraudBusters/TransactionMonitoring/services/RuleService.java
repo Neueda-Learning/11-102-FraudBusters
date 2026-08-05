@@ -23,7 +23,7 @@ public class RuleService {
     private final RuleEntityRepository ruleEntityRepository;
     private final ObjectMapper objectMapper;
 
-    @Value("${rules.configure.password:123}")
+    @Value("${rules.configure.password:12345}")
     private String configurePassword;
 
     /**
