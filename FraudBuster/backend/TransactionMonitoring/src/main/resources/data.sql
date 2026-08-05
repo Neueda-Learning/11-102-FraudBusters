@@ -354,3 +354,146 @@ VALUES
         NULL
     );
 
+-- ============================================================
+--  Seed Data: Transaction Decisions
+--  Stores final outcomes used by daily-limit aggregation logic
+--  (only ALLOW decisions should contribute to spend totals).
+-- ============================================================
+
+INSERT IGNORE INTO transaction_decisions (
+    transaction_id,
+    alert_id,
+    decision,
+    decided_by,
+    decision_reason
+)
+VALUES
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-001'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-002'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-003'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-004'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-005'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-006'),
+        NULL,
+        'DECLINE',
+        'SYSTEM',
+        'Seeded declined decision for daily limit test'
+    );
+
+-- ============================================================
+--  Seed Data: Today Test Records for Daily Limit API
+--  These rows are dated for the current test day so the API
+--  can be verified immediately with today-based aggregation.
+--  Prior ALLOW total = 49,000 for acct_dl_today_001.
+-- ============================================================
+
+INSERT IGNORE INTO transactions (
+    txn_id,
+    account_id,
+    customer_full_name,
+    customer_email,
+    customer_phone,
+    payee_id,
+    amount,
+    currency,
+    txn_type,
+    txn_timestamp,
+    monitor_state,
+    hold_started_at,
+    hold_expires_at,
+    final_decision,
+    decision_reason,
+    decided_at
+)
+VALUES
+    (
+        'TXN-DL-TODAY-001',
+        'acct_dl_today_001',
+        'Kabir Mehta',
+        'kabir.mehta@example.com',
+        '+919900000401',
+        'payee_dl_001',
+        24000.00,
+        'USD',
+        'DEBIT',
+        '2026-08-05 09:00:00.000',
+        'RELEASED',
+        NULL,
+        NULL,
+        'ALLOW',
+        'Seeded allowed transaction for today test',
+        '2026-08-05 09:00:00.000'
+    ),
+    (
+        'TXN-DL-TODAY-002',
+        'acct_dl_today_001',
+        'Kabir Mehta',
+        'kabir.mehta@example.com',
+        '+919900000401',
+        'payee_dl_001',
+        25000.00,
+        'USD',
+        'DEBIT',
+        '2026-08-05 10:00:00.000',
+        'RELEASED',
+        NULL,
+        NULL,
+        'ALLOW',
+        'Seeded allowed transaction for today test',
+        '2026-08-05 10:00:00.000'
+    );
+
+INSERT IGNORE INTO transaction_decisions (
+    transaction_id,
+    alert_id,
+    decision,
+    decided_by,
+    decision_reason
+)
+VALUES
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-TODAY-001'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for today test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-TODAY-002'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for today test'
+    );
+
