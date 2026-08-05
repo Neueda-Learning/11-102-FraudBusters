@@ -4,6 +4,7 @@ import com.FraudBusters.TransactionMonitoring.models.dto.TransactionResponseDTO;
 import com.FraudBusters.TransactionMonitoring.services.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +18,7 @@ import java.util.List;
  * GET /api/transactions          → list all transactions
  * GET /api/transactions/{txnId}  → single transaction by business ID
  */
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/transactions")
 @RequiredArgsConstructor

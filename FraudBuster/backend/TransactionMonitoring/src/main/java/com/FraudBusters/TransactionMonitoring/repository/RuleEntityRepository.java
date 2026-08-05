@@ -10,6 +10,9 @@ import java.util.Optional;
 @Repository
 public interface RuleEntityRepository extends JpaRepository<RuleEntity, Long> {
 
+    /** All non-deleted rules (active + inactive) for rules dashboard cards and list */
+    List<RuleEntity> findByIsDeletedFalse();
+
     /** All rules that are active and not soft-deleted (used for the Rules list screen) */
     List<RuleEntity> findByIsActiveTrueAndIsDeletedFalse();
 

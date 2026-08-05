@@ -1,15 +1,15 @@
 package com.FraudBusters.TransactionMonitoring.controllers;
 
 import com.FraudBusters.TransactionMonitoring.models.dto.RuleResponseDTO;
+import com.FraudBusters.TransactionMonitoring.models.dto.RulesListResponseDTO;
 import com.FraudBusters.TransactionMonitoring.services.RuleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * REST endpoints for the Operator Rules screen on the frontend.
@@ -18,6 +18,7 @@ import java.util.List;
  * GET /api/rules/{code}   → single rule detail by ruleCode
  */
 @RestController
+@CrossOrigin(origins = "*")
 @RequestMapping("/api/rules")
 @RequiredArgsConstructor
 public class RuleController {
@@ -25,8 +26,8 @@ public class RuleController {
     private final RuleService ruleService;
 
     /**
-     * Returns all active rules.
-     * Frontend uses this to populate the Rules Management table.
+     * Returns all non-deleted rules with top-card counts.
+     * Frontend uses this to populate rules summary cards and rule cards.
      *
      * Response example:
      * [
@@ -43,8 +44,8 @@ public class RuleController {
      * ]
      */
     @GetMapping
-    public ResponseEntity<List<RuleResponseDTO>> getAllRules() {
-        return ResponseEntity.ok(ruleService.getAllActiveRules());
+    public ResponseEntity<RulesListResponseDTO> getAllRules() {
+        return ResponseEntity.ok(ruleService.getRulesPageData());
     }
 
     /**
