@@ -1,9 +1,14 @@
 package com.FraudBusters.TransactionMonitoring.repository;
 
 import com.FraudBusters.TransactionMonitoring.models.TransactionEntity;
+import com.FraudBusters.TransactionMonitoring.models.enums.FinalDecision;
+import com.FraudBusters.TransactionMonitoring.models.enums.MonitorState;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface TransactionEntityRepository extends JpaRepository<TransactionEntity, Long> {
@@ -11,6 +16,30 @@ public interface TransactionEntityRepository extends JpaRepository<TransactionEn
     /** Look up a transaction by its unique business ID */
     Optional<TransactionEntity> findByTxnId(String txnId);
 
+    /**
+     * Check whether this account has already used the same payee in a previous transaction.
+     * Excludes the current txnId so the current in-flight row does not count as history.
+     */
+    boolean existsByAccountIdAndPayeeIdAndTxnIdNot(String accountId, String payeeId, String txnId);
+
+    /**
+     * Fetch all DEBIT transactions for an account within a time window.
+     * Used by the DAILY_LIMIT rule to sum up the day's spend.
+     */
+    @Query("SELECT t FROM TransactionEntity t " +
+           "WHERE t.accountId = :accountId " +
+           "AND t.txnType = TransactionType.DEBIT " +
+           "AND t.txnTimestamp >= :startOfDay " +
+           "AND t.txnTimestamp <= :endOfDay")
+    List<TransactionEntity> findDebitTransactionsByAccountAndDay(
+            @Param("accountId") String accountId,
+            @Param("startOfDay") LocalDateTime startOfDay,
+            @Param("endOfDay") LocalDateTime endOfDay);
+
+    /** Polling helper for continuous evaluation workers. */
+    List<TransactionEntity> findTop100ByMonitorStateAndFinalDecisionOrderByTxnTimestampAsc(
+            MonitorState monitorState,
+            FinalDecision finalDecision);
     /** Dashboard summary count for today's transactions using [start, end) on createdAt. */
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);
 }

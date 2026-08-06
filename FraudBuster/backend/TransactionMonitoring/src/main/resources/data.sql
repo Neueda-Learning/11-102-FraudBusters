@@ -20,11 +20,11 @@ VALUES
     (
         'VELOCITY_CHECK',
         'Velocity Rule',
-        'Trigger alert when N transactions occur within T time period from the same account. Example: Alert if more than 5 transactions occur within 6 hours.',
+        'Trigger alert when N transactions occur within T time period from the same account. Example: Alert if more than 5 transactions occur within 10 minutes.',
         'VELOCITY',
         'HIGH',
         'INLINE',
-        '{"maxTransactions": 5, "windowHours": 6}',
+        '{"windowMinutes": 10, "maxTransactions": 5}',
         true,
         false
     ),
@@ -353,4 +353,370 @@ VALUES
         NULL,
         NULL
     );
+
+-- ============================================================
+--  Seed Data: Transaction Decisions
+--  Stores final outcomes used by daily-limit aggregation logic
+--  (only ALLOW decisions should contribute to spend totals).
+-- ============================================================
+
+INSERT IGNORE INTO transaction_decisions (
+    transaction_id,
+    alert_id,
+    decision,
+    decided_by,
+    decision_reason
+)
+VALUES
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-001'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for velocity check test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-002'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for velocity check test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-003'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for velocity check test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-004'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for velocity check test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-005'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for velocity check test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-001'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-002'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-003'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-004'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-005'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for daily limit test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-006'),
+        NULL,
+        'DECLINE',
+        'SYSTEM',
+        'Seeded declined decision for daily limit test'
+    );
+
+-- ============================================================
+--  Seed Data: Today Test Records for Daily Limit API
+--  These rows are dated for the current test day so the API
+--  can be verified immediately with today-based aggregation.
+--  Prior ALLOW total = 49,000 for acct_dl_today_001.
+-- ============================================================
+
+INSERT IGNORE INTO transactions (
+    txn_id,
+    account_id,
+    customer_full_name,
+    customer_email,
+    customer_phone,
+    payee_id,
+    amount,
+    currency,
+    txn_type,
+    txn_timestamp,
+    monitor_state,
+    hold_started_at,
+    hold_expires_at,
+    final_decision,
+    decision_reason,
+    decided_at
+)
+VALUES
+    (
+        'TXN-DL-TODAY-001',
+        'acct_dl_today_001',
+        'Kabir Mehta',
+        'kabir.mehta@example.com',
+        '+919900000401',
+        'payee_dl_001',
+        24000.00,
+        'USD',
+        'DEBIT',
+        '2026-08-05 09:00:00.000',
+        'RELEASED',
+        NULL,
+        NULL,
+        'ALLOW',
+        'Seeded allowed transaction for today test',
+        '2026-08-05 09:00:00.000'
+    ),
+    (
+        'TXN-DL-TODAY-002',
+        'acct_dl_today_001',
+        'Kabir Mehta',
+        'kabir.mehta@example.com',
+        '+919900000401',
+        'payee_dl_001',
+        25000.00,
+        'USD',
+        'DEBIT',
+        '2026-08-05 10:00:00.000',
+        'RELEASED',
+        NULL,
+        NULL,
+        'ALLOW',
+        'Seeded allowed transaction for today test',
+        '2026-08-05 10:00:00.000'
+    );
+
+INSERT IGNORE INTO transaction_decisions (
+    transaction_id,
+    alert_id,
+    decision,
+    decided_by,
+    decision_reason
+)
+VALUES
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-TODAY-001'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for today test'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-DL-TODAY-002'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded successful decision for today test'
+    );
+
+
+-- ============================================================
+--  Seed Data: Velocity Rule Edge Cases
+--  Account acct_vel_edge_001 is used to validate:
+--  1) false on 5th txn, 2) true on 6th txn,
+--  3) exact boundary inclusion, 4) DECLINE does not count.
+-- ============================================================
+
+INSERT IGNORE INTO transactions (
+    txn_id,
+    account_id,
+    customer_full_name,
+    customer_email,
+    customer_phone,
+    payee_id,
+    amount,
+    currency,
+    txn_type,
+    txn_timestamp,
+    monitor_state,
+    hold_started_at,
+    hold_expires_at,
+    final_decision,
+    decision_reason,
+    decided_at
+)
+VALUES
+    (
+        'TXN-VEL-EDGE-001',
+        'acct_vel_edge_001',
+        'Edge User',
+        'edge.user@example.com',
+        '+919900009901',
+        'payee_vel_edge_001',
+        100.00,
+        'USD',
+        'DEBIT',
+        '2025-01-15 11:00:00.000',
+        'RELEASED',
+        NULL,
+        NULL,
+        'ALLOW',
+        'Seeded velocity edge-case allowed transaction',
+        '2025-01-15 11:00:00.000'
+    ),
+    (
+        'TXN-VEL-EDGE-002',
+        'acct_vel_edge_001',
+        'Edge User',
+        'edge.user@example.com',
+        '+919900009901',
+        'payee_vel_edge_001',
+        110.00,
+        'USD',
+        'DEBIT',
+        '2025-01-15 11:02:00.000',
+        'RELEASED',
+        NULL,
+        NULL,
+        'ALLOW',
+        'Seeded velocity edge-case allowed transaction',
+        '2025-01-15 11:02:00.000'
+    ),
+    (
+        'TXN-VEL-EDGE-003',
+        'acct_vel_edge_001',
+        'Edge User',
+        'edge.user@example.com',
+        '+919900009901',
+        'payee_vel_edge_001',
+        120.00,
+        'USD',
+        'DEBIT',
+        '2025-01-15 11:04:00.000',
+        'RELEASED',
+        NULL,
+        NULL,
+        'ALLOW',
+        'Seeded velocity edge-case allowed transaction',
+        '2025-01-15 11:04:00.000'
+    ),
+    (
+        'TXN-VEL-EDGE-004',
+        'acct_vel_edge_001',
+        'Edge User',
+        'edge.user@example.com',
+        '+919900009901',
+        'payee_vel_edge_001',
+        130.00,
+        'USD',
+        'DEBIT',
+        '2025-01-15 11:06:00.000',
+        'RELEASED',
+        NULL,
+        NULL,
+        'ALLOW',
+        'Seeded velocity edge-case allowed transaction',
+        '2025-01-15 11:06:00.000'
+    ),
+    (
+        'TXN-VEL-EDGE-005',
+        'acct_vel_edge_001',
+        'Edge User',
+        'edge.user@example.com',
+        '+919900009901',
+        'payee_vel_edge_001',
+        140.00,
+        'USD',
+        'DEBIT',
+        '2025-01-15 11:08:00.000',
+        'RELEASED',
+        NULL,
+        NULL,
+        'ALLOW',
+        'Seeded velocity edge-case allowed transaction',
+        '2025-01-15 11:08:00.000'
+    ),
+    (
+        'TXN-VEL-EDGE-DECL-001',
+        'acct_vel_edge_001',
+        'Edge User',
+        'edge.user@example.com',
+        '+919900009901',
+        'payee_vel_edge_001',
+        150.00,
+        'USD',
+        'DEBIT',
+        '2025-01-15 11:09:00.000',
+        'DECLINED',
+        NULL,
+        NULL,
+        'DECLINE',
+        'Seeded velocity edge-case declined transaction',
+        '2025-01-15 11:09:00.000'
+    );
+
+INSERT IGNORE INTO transaction_decisions (
+    transaction_id,
+    alert_id,
+    decision,
+    decided_by,
+    decision_reason
+)
+VALUES
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-EDGE-001'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded velocity edge-case allowed decision'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-EDGE-002'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded velocity edge-case allowed decision'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-EDGE-003'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded velocity edge-case allowed decision'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-EDGE-004'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded velocity edge-case allowed decision'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-EDGE-005'),
+        NULL,
+        'ALLOW',
+        'SYSTEM',
+        'Seeded velocity edge-case allowed decision'
+    ),
+    (
+        (SELECT id FROM transactions WHERE txn_id = 'TXN-VEL-EDGE-DECL-001'),
+        NULL,
+        'DECLINE',
+        'SYSTEM',
+        'Seeded velocity edge-case declined decision (should not count)'
+    );
+
 

@@ -4,81 +4,87 @@ import com.FraudBusters.TransactionMonitoring.models.AlertEntity;
 import com.FraudBusters.TransactionMonitoring.models.AlertTransactionEntity;
 import com.FraudBusters.TransactionMonitoring.models.RuleEntity;
 import com.FraudBusters.TransactionMonitoring.models.TransactionEntity;
+import com.FraudBusters.TransactionMonitoring.models.dto.TransactionRequestDTO;
 import com.FraudBusters.TransactionMonitoring.models.enums.AlertRelationType;
 import com.FraudBusters.TransactionMonitoring.models.enums.AlertStatus;
 import com.FraudBusters.TransactionMonitoring.models.enums.FinalDecision;
 import com.FraudBusters.TransactionMonitoring.models.enums.MonitorState;
-import com.FraudBusters.TransactionMonitoring.models.enums.SeverityLevel;
 import com.FraudBusters.TransactionMonitoring.repository.AlertEntityRepository;
 import com.FraudBusters.TransactionMonitoring.repository.AlertTransactionEntityRepo;
 import com.FraudBusters.TransactionMonitoring.repository.RuleEntityRepository;
 import com.FraudBusters.TransactionMonitoring.repository.TransactionEntityRepository;
 import com.FraudBusters.TransactionMonitoring.services.RuleEngineService;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
-public class RuleEngineServiceImpl implements RuleEngineService {
+public class NewPayeeRuleEngineImpl implements RuleEngineService {
 
     @Autowired
     private AlertEntityRepository alertEntityRepository;
+
     @Autowired
     private RuleEntityRepository ruleEntityRepository;
+
     @Autowired
     private TransactionEntityRepository transactionEntityRepository;
+
     @Autowired
     private AlertTransactionEntityRepo alertTransactionEntityRepository;
 
-    private static final Pattern THRESHOLD_PATTERN =
-            Pattern.compile("\\\"thresholdAmount\\\"\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)");
+    @Autowired
+    private ModelMapper modelMapper;
 
-
-    //implement  evaluateTransactionUsingAmountThreshold method to check if the transaction amount exceeds the threshold defined in the AMOUNT_THRESHOLD rule. If it does, create an alert and associate it with the transaction. If not, update the transaction state to RELEASED and set the final decision to ALLOW.
-
+    public Optional<Boolean> evaluateTransaction(TransactionRequestDTO transactionRequestDTO) {
+        TransactionEntity transactionEntity = modelMapper.map(transactionRequestDTO, TransactionEntity.class);
+        return Optional.of(evaluateTransaction(transactionEntity));
+    }
 
     @Override
-    public boolean evaluateTransactionUsingAmountThreshold(TransactionEntity transaction) {
-        Optional<RuleEntity> amountThresholdRuleOpt =
-                ruleEntityRepository.findByRuleCodeAndIsDeletedFalse("AMOUNT_THRESHOLD");
+    public boolean evaluateTransaction(TransactionEntity transaction) {
+        Optional<RuleEntity> newPayeeRuleOpt =
+                ruleEntityRepository.findByRuleCodeAndIsDeletedFalse("NEW_PAYEE");
 
-        if (amountThresholdRuleOpt.isEmpty()) {
-            throw new IllegalStateException("AMOUNT_THRESHOLD rule is not configured in database");
+        if (newPayeeRuleOpt.isEmpty()) {
+            throw new IllegalStateException("NEW_PAYEE rule is not configured in database");
         }
 
-        // Resolve the transaction: if it already exists in DB, use that record (has the real id).
-        // If it does not exist yet, save it first so it gets an id, then evaluate.
+        // Reuse persisted row if txn_id already exists; otherwise save it first so it has an id.
         TransactionEntity resolvedTransaction = transactionEntityRepository
                 .findByTxnId(transaction.getTxnId())
                 .orElseGet(() -> {
                     transaction.setMonitorState(MonitorState.RECEIVED);
                     transaction.setFinalDecision(FinalDecision.PENDING);
-                    transaction.setCreatedAt(LocalDateTime.now());
                     transaction.setUpdatedAt(LocalDateTime.now());
                     return transactionEntityRepository.save(transaction);
                 });
 
-        RuleEntity amountThresholdRule = amountThresholdRuleOpt.get();
-        BigDecimal thresholdAmount = getThresholdValueFromConfigJson(amountThresholdRule);
+        RuleEntity newPayeeRule = newPayeeRuleOpt.get();
 
-        if (resolvedTransaction.getAmount().compareTo(thresholdAmount) > 0) {
+        boolean relationExists = transactionEntityRepository
+                .existsByAccountIdAndPayeeIdAndTxnIdNot(
+                        resolvedTransaction.getAccountId(),
+                        resolvedTransaction.getPayeeId(),
+                        resolvedTransaction.getTxnId());
+
+        if (!relationExists) {
             resolvedTransaction.setMonitorState(MonitorState.HELD);
             resolvedTransaction.setUpdatedAt(LocalDateTime.now());
             resolvedTransaction.setDecidedAt(LocalDateTime.now());
-
             transactionEntityRepository.save(resolvedTransaction);
 
             AlertEntity alertEntity = new AlertEntity();
-            alertEntity.setTitle("High Amount Transaction Detected");
-            alertEntity.setDescription("Transaction amount exceeds the defined threshold of " + thresholdAmount);
-            alertEntity.setAlertCode("AMT-" + System.currentTimeMillis());
-            alertEntity.setSeverity(SeverityLevel.HIGH);
-            alertEntity.setRule(amountThresholdRule);
+            String contextDescription = "Account " + resolvedTransaction.getAccountId()
+                    + " has used payee " + resolvedTransaction.getPayeeId() + " for the first time";
+            alertEntity.setTitle(resolveRuleTitle(newPayeeRule, "New Payee Detected"));
+            alertEntity.setDescription(buildRuleDescription(newPayeeRule, contextDescription));
+            alertEntity.setAlertCode("NP-" + System.currentTimeMillis());
+            alertEntity.setSeverity(newPayeeRule.getSeverityDefault());
+            alertEntity.setRule(newPayeeRule);
             alertEntity.setStatus(AlertStatus.OPEN);
             alertEntity.setCreatedAt(LocalDateTime.now());
             alertEntity.setUpdatedAt(LocalDateTime.now());
@@ -95,27 +101,32 @@ public class RuleEngineServiceImpl implements RuleEngineService {
             return true;
         }
 
+        // Do not override a hold created by another rule in multi-rule orchestration.
+        if (MonitorState.HELD.equals(resolvedTransaction.getMonitorState())) {
+            return false;
+        }
+
         resolvedTransaction.setMonitorState(MonitorState.RELEASED);
         resolvedTransaction.setUpdatedAt(LocalDateTime.now());
         resolvedTransaction.setDecidedAt(LocalDateTime.now());
-        resolvedTransaction.setDecisionReason("Transaction amount is within the defined threshold of " + thresholdAmount);
+        resolvedTransaction.setDecisionReason("Payee relation already exists for account "
+                + resolvedTransaction.getAccountId() + " and payee " + resolvedTransaction.getPayeeId());
         resolvedTransaction.setFinalDecision(FinalDecision.ALLOW);
         transactionEntityRepository.save(resolvedTransaction);
 
         return false;
     }
 
-    private BigDecimal getThresholdValueFromConfigJson(RuleEntity ruleEntity) {
-        String configJson = ruleEntity.getConfigJson();
-        if (configJson == null || configJson.isBlank()) {
-            throw new IllegalStateException("AMOUNT_THRESHOLD rule config_json is empty");
-        }
+    private String resolveRuleTitle(RuleEntity ruleEntity, String fallbackTitle) {
+        return (ruleEntity.getName() == null || ruleEntity.getName().isBlank())
+                ? fallbackTitle
+                : ruleEntity.getName();
+    }
 
-        Matcher matcher = THRESHOLD_PATTERN.matcher(configJson);
-        if (!matcher.find()) {
-            throw new IllegalStateException("thresholdAmount is missing in AMOUNT_THRESHOLD rule config_json");
+    private String buildRuleDescription(RuleEntity ruleEntity, String contextDescription) {
+        if (ruleEntity.getDescription() == null || ruleEntity.getDescription().isBlank()) {
+            return contextDescription;
         }
-
-        return new BigDecimal(matcher.group(1));
+        return ruleEntity.getDescription() + " | " + contextDescription;
     }
 }
