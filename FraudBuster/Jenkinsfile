@@ -2,11 +2,17 @@ pipeline {
 
     agent any
 
+    environment {
+        GIT_URL = 'https://github.com/Neueda-Learning/11-102-FraudBusters.git'
+        BRANCH = 'main'
+    }
+
     stages {
 
         stage('Checkout Source') {
             steps {
-                checkout scm
+                git branch: "${BRANCH}",
+                    url: "${GIT_URL}"
             }
         }
 
