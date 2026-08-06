@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Alerts - TxMonitor</title>
+    <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <a class="sidebar-brand" href="./dashboard.html">
+            <div class="brand-mark">FB</div>
+            <div class="brand-text">
+                <div class="brand-name">Fraud Busters</div>
+                <div class="brand-sub">Fraud Detection</div>
+            </div>
+        </a>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="nav-group-label">Main</div>
+        <a class="nav-item" href="./dashboard.html">Dashboard</a>
+        <a class="nav-item" href="./alerts.html">Alerts </a>
+        <a class="nav-item" href="./transactions.html">Transactions</a>
+        <div class="nav-group-label" style="margin-top:10px;">Config</div>
+        <a class="nav-item" href="./rules.html">Rules</a>
+        <a class="nav-item" href="./history.html">Alert History</a>
+    </nav>
+</div>
+
+<div class="main">
+    <div class="topbar">
+        <div>
+            <h1>All Alerts</h1>
+            <div class="sub">Live alert monitoring from FraudBustersDB</div>
+        </div>
+    </div>
+
+    <div class="tabs" id="alert-tabs">
+        <button class="tab active" data-status="all">All (0)</button>
+        <button class="tab" data-status="OPEN">Open (0)</button>
+        <button class="tab" data-status="ACKNOWLEDGED">Acknowledged (0)</button>
+        <button class="tab" data-status="INVESTIGATING">Investigating (0)</button>
+    </div>
+
+    <div class="two-col">
+        <div class="section">
+            <div class="section-header">
+                <h2>Alert List</h2>
+                <div class="search-bar">
+                    <label class="sr-only" for="alert-search">Search alerts</label>
+                    <input id="alert-search" type="text" placeholder="Search alerts..."/>
+                    <button class="filter-btn" type="button">Filter</button>
+                </div>
+            </div>
+            <table>
+                <thead>
+                <tr><th>ID</th><th>Severity</th><th>Rule</th><th>Status</th></tr>
+                </thead>
+                <tbody id="alert-list-body">
+                <tr><td colspan="4" style="color:var(--text-muted);">Loading alerts...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="alert-detail" class="alert-detail">
+            <h3 id="detail-title">Alert Detail</h3>
+            <div class="detail-row"><span class="key">Status</span><span class="val" id="d-status">-</span></div>
+            <div class="detail-row"><span class="key">Severity</span><span class="val" id="d-severity">-</span></div>
+            <div class="detail-row"><span class="key">Rule Triggered</span><span class="val" id="d-rule">-</span></div>
+            <div class="detail-row"><span class="key">Account</span><span class="val" id="d-account">-</span></div>
+            <div class="detail-row"><span class="key">Amount</span><span class="val val-alert" id="d-amount">-</span></div>
+            <div class="detail-row"><span class="key">Payee</span><span class="val" id="d-payee">-</span></div>
+            <div class="detail-row"><span class="key">Created At</span><span class="val" id="d-created">-</span></div>
+            <div class="detail-row"><span class="key">Threshold</span><span class="val" id="d-threshold">-</span></div>
+
+            <div class="caps-title">Related Transaction</div>
+            <table>
+                <thead><tr><th>Txn ID</th><th>Amount</th><th>Time</th></tr></thead>
+                <tbody>
+                <tr>
+                    <td id="d-txn-id">-</td>
+                    <td id="d-txn-amt" class="text-danger text-strong">-</td>
+                    <td id="d-txn-time">-</td>
+                </tr>
+                </tbody>
+            </table>
+
+            <div class="caps-title">Actions</div>
+            <div class="action-group">
+                <button class="btn btn-ack" type="button" onclick="alert('Action endpoint can be wired next.')">Acknowledge</button>
+                <button class="btn btn-inv" type="button" onclick="alert('Action endpoint can be wired next.')">Investigate</button>
+                <button class="btn btn-close" type="button" onclick="alert('Action endpoint can be wired next.')">Close</button>
+                <button class="btn btn-dismiss" type="button" onclick="alert('Action endpoint can be wired next.')">Dismiss</button>
+            </div>
+            <div style="margin-top:12px;">
+                <label class="sr-only" for="resolution-notes">Resolution notes</label>
+                <textarea id="resolution-notes" placeholder="Add resolution notes here..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <footer>TxMonitor MVP &mdash; Transaction Monitoring &amp; Alerts System</footer>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:8082/api";
+
+    let alertsData = [];
+    let selectedAlertCode = null;
+    let activeFilter = "all";
+
+    function toSentence(value) {
+      return (value || "").toLowerCase().replace(/(^|\s)\S/g, function (m) { return m.toUpperCase(); });
+    }
+
+    function formatDate(value) {
+      if (!value) return "-";
+      return new Date(value).toLocaleString();
+    }
+
+    function rowMatchesFilter(alert) {
+      if (activeFilter === "all") return true;
+      return (alert.status || "") === activeFilter;
+    }
+
+    function rowMatchesSearch(alert, query) {
+      if (!query) return true;
+      const text = [
+        alert.alertCode,
+        alert.ruleName,
+        alert.status,
+        alert.severity,
+        alert.accountId,
+        alert.payeeId
+      ].join(" ").toLowerCase();
+      return text.includes(query.toLowerCase());
+    }
+
+    function renderTabs(counts) {
+      const tabs = document.querySelectorAll("#alert-tabs .tab");
+      tabs.forEach(function (tab) {
+        const status = tab.dataset.status;
+        if (status === "all") tab.textContent = `All (${counts.total})`;
+        if (status === "OPEN") tab.textContent = `Open (${counts.open})`;
+        if (status === "ACKNOWLEDGED") tab.textContent = `Acknowledged (${counts.ack})`;
+        if (status === "INVESTIGATING") tab.textContent = `Investigating (${counts.inv})`;
+        tab.classList.toggle("active", (activeFilter === "all" && status === "all") || activeFilter === status);
+      });
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("alert-list-body");
+      const query = document.getElementById("alert-search").value || "";
+
+      const filtered = alertsData.filter(function (a) {
+        return rowMatchesFilter(a) && rowMatchesSearch(a, query);
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="color:var(--text-muted);">No alerts found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(function (a) {
+        const selectedClass = selectedAlertCode === a.alertCode ? " style='background:#F4F8FF;cursor:pointer;'" : " style='cursor:pointer;'";
+        return `
+          <tr data-alert-code="${a.alertCode}"${selectedClass}>
+            <td>${a.alertCode || "-"}</td>
+            <td><span class="severity-badge ${a.severityClass || "sev-low"}">${toSentence(a.severity || "LOW")}</span></td>
+            <td>${a.ruleName || "-"}</td>
+            <td><span class="status-badge ${a.statusClass || "st-open"}">${toSentence(a.status || "OPEN")}</span></td>
+          </tr>`;
+      }).join("");
+
+      Array.from(tbody.querySelectorAll("tr[data-alert-code]")).forEach(function (row) {
+        row.addEventListener("click", function () {
+          const code = row.getAttribute("data-alert-code");
+          const alert = alertsData.find(function (a) { return a.alertCode === code; });
+          if (alert) {
+            selectedAlertCode = alert.alertCode;
+            renderDetail(alert);
+            renderTable();
+          }
+        });
+      });
+    }
+
+    function renderDetail(alert) {
+      document.getElementById("detail-title").textContent = `Alert Detail - ${alert.alertCode || "-"}`;
+      document.getElementById("d-status").innerHTML = `<span class="status-badge ${alert.statusClass || "st-open"}">${toSentence(alert.status || "OPEN")}</span>`;
+      document.getElementById("d-severity").innerHTML = `<span class="severity-badge ${alert.severityClass || "sev-low"}">${toSentence(alert.severity || "LOW")}</span>`;
+      document.getElementById("d-rule").textContent = alert.ruleName || "-";
+      document.getElementById("d-account").textContent = alert.accountId || "-";
+      document.getElementById("d-amount").textContent = alert.amount || "-";
+      document.getElementById("d-payee").textContent = alert.payeeId || "-";
+      document.getElementById("d-created").textContent = formatDate(alert.createdAt);
+      document.getElementById("d-threshold").textContent = alert.threshold || "-";
+      document.getElementById("d-txn-id").textContent = alert.relatedTxnId || "-";
+      document.getElementById("d-txn-amt").textContent = alert.relatedTxnAmount || "-";
+      document.getElementById("d-txn-time").textContent = alert.relatedTxnTime || "-";
+    }
+
+    async function loadAlerts() {
+      const response = await fetch(`${API_BASE}/alerts`);
+      if (!response.ok) throw new Error("Failed to load alerts from API");
+
+      const data = await response.json();
+      alertsData = data.alerts || [];
+
+      const counts = {
+        total: data.totalAlerts || 0,
+        open: data.openAlerts || 0,
+        ack: data.acknowledgedAlerts || 0,
+        inv: data.investigatingAlerts || 0
+      };
+
+      document.getElementById("alerts-nav-count").textContent = counts.open;
+      renderTabs(counts);
+
+      if (alertsData.length > 0) {
+        selectedAlertCode = alertsData[0].alertCode;
+        renderDetail(alertsData[0]);
+      } else {
+        selectedAlertCode = null;
+      }
+
+      renderTable();
+    }
+
+    document.getElementById("alert-search").addEventListener("input", renderTable);
+    Array.from(document.querySelectorAll("#alert-tabs .tab")).forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        activeFilter = tab.dataset.status;
+        renderTabs({
+          total: alertsData.length,
+          open: alertsData.filter(a => a.status === "OPEN").length,
+          ack: alertsData.filter(a => a.status === "ACKNOWLEDGED").length,
+          inv: alertsData.filter(a => a.status === "INVESTIGATING").length
+        });
+        renderTable();
+      });
+    });
+
+    loadAlerts().catch(function (error) {
+      console.error(error);
+      document.getElementById("alert-list-body").innerHTML =
+        `<tr><td colspan="4" style="color:#B91C1C;">Could not load alerts. Check backend API at ${API_BASE}.</td></tr>`;
+    });
+</script>
+</body>
+</html>
+
+

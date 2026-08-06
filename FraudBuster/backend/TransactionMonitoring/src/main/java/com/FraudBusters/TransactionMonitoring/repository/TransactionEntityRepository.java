@@ -40,4 +40,6 @@ public interface TransactionEntityRepository extends JpaRepository<TransactionEn
     List<TransactionEntity> findTop100ByMonitorStateAndFinalDecisionOrderByTxnTimestampAsc(
             MonitorState monitorState,
             FinalDecision finalDecision);
+    /** Dashboard summary count for today's transactions using [start, end) on createdAt. */
+    long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);
 }
