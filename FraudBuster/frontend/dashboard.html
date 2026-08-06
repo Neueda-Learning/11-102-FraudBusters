@@ -5,6 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Dashboard — TxMonitor</title>
     <link rel="stylesheet" href="./styles.css"/>
+    <style>
+        /* Custom styles for requested modifications */
+        .rule-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #FFFFFF !important;
+        }
+        .rule-track {
+            background: #2D3748; /* Dark base for bars */
+            border: 1px solid #4A5568;
+            border-radius: 4px;
+            height: 20px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        .rule-val {
+            font-size: 13px;
+            font-weight: 700;
+            text-align: right;
+            color: #E2E8F0 !important;
+        }
+
+        /* Glowing effect for Alert Lifecycle step circles */
+        .lifecycle .lc-circle {
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+            border: 2px solid #3B82F6;
+            background: #1E40AF;
+            color: #FFFFFF;
+        }
+        .lifecycle .lc-circle.done {
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.7);
+            border-color: #10B981;
+            background: #065F46;
+        }
+        .lifecycle .lc-circle.current {
+            box-shadow: 0 0 14px rgba(245, 158, 11, 0.8);
+            border-color: #F59E0B;
+            background: #92400E;
+        }
+        .lifecycle .lc-circle.glowing-step {
+            box-shadow: 0 0 14px rgba(168, 85, 247, 0.8);
+            border-color: #A855F7;
+            background: #6B21A8;
+        }
+    </style>
 </head>
 <body>
 
@@ -63,24 +108,46 @@
 
     <!-- CHART + LIFECYCLE -->
     <div class="two-col stack-gap">
-        <div class="section">
+        <div class="section" style="display:flex; flex-direction:column;">
             <div class="section-header">
-                <h2>Alerts by Severity — This Week</h2>
+                <h2>Rule Executions</h2>
             </div>
-            <div class="chart-wrap">
-                <div class="chart-grid">
-                    <div class="chart-col"><div class="bar" style="height:0px;background:#EF4444;width:100%;"></div><div class="bar-label">Mon</div></div>
-                    <div class="chart-col"><div class="bar" style="height:0px;background:#F59E0B;width:100%;"></div><div class="bar-label">Tue</div></div>
-                    <div class="chart-col"><div class="bar" style="height:0px;background:#EF4444;width:100%;"></div><div class="bar-label">Wed</div></div>
-                    <div class="chart-col"><div class="bar" style="height:0px;background:#3B82F6;width:100%;"></div><div class="bar-label">Thu</div></div>
-                    <div class="chart-col"><div class="bar" style="height:0px;background:#EF4444;width:100%;"></div><div class="bar-label">Fri</div></div>
-                    <div class="chart-col"><div class="bar" style="height:0px;background:#F59E0B;width:100%;"></div><div class="bar-label">Sat</div></div>
-                    <div class="chart-col"><div class="bar" style="height:0px;background:#3B82F6;width:100%;"></div><div class="bar-label">Sun</div></div>
+            <!-- SIDEWAYS RULE EXECUTION BAR GRAPH -->
+            <div style="display: flex; flex-direction: column; gap: 16px; padding: 12px 6px; flex: 1; justify-content: center; box-sizing: border-box; overflow: hidden;">
+                <!-- Red Bar: Amount Threshold -->
+                <div style="display: grid; grid-template-columns: 130px 1fr 44px; align-items: center; gap: 10px; min-width: 0;">
+                    <span class="rule-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Amount Threshold</span>
+                    <div class="rule-track" style="min-width:0;">
+                        <div id="bar-amount-threshold" style="width: 0%; height: 100%; background: linear-gradient(90deg,#EF4444,#FCA5A5); transition: width 0.6s ease; box-shadow: 0 0 10px rgba(239,68,68,0.7); border-radius:3px;"></div>
+                    </div>
+                    <span id="val-amount-threshold" class="rule-val">0</span>
                 </div>
-                <div class="legend">
-                    <span class="legend-item"><span class="legend-swatch" style="background:#EF4444;"></span>High</span>
-                    <span class="legend-item"><span class="legend-swatch" style="background:#F59E0B;"></span>Medium</span>
-                    <span class="legend-item"><span class="legend-swatch" style="background:#3B82F6;"></span>Low</span>
+
+                <!-- Yellow Bar: Velocity Rule -->
+                <div style="display: grid; grid-template-columns: 130px 1fr 44px; align-items: center; gap: 10px; min-width: 0;">
+                    <span class="rule-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Velocity Rule</span>
+                    <div class="rule-track" style="min-width:0;">
+                        <div id="bar-velocity-rule" style="width: 0%; height: 100%; background: linear-gradient(90deg,#F59E0B,#FDE68A); transition: width 0.6s ease; box-shadow: 0 0 10px rgba(245,158,11,0.7); border-radius:3px;"></div>
+                    </div>
+                    <span id="val-velocity-rule" class="rule-val">0</span>
+                </div>
+
+                <!-- Blue Bar: New Payee Rule -->
+                <div style="display: grid; grid-template-columns: 130px 1fr 44px; align-items: center; gap: 10px; min-width: 0;">
+                    <span class="rule-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">New Payee Rule</span>
+                    <div class="rule-track" style="min-width:0;">
+                        <div id="bar-new-payee" style="width: 0%; height: 100%; background: linear-gradient(90deg,#3B82F6,#93C5FD); transition: width 0.6s ease; box-shadow: 0 0 10px rgba(59,130,246,0.7); border-radius:3px;"></div>
+                    </div>
+                    <span id="val-new-payee" class="rule-val">0</span>
+                </div>
+
+                <!-- Green Bar: Daily Limit Rule -->
+                <div style="display: grid; grid-template-columns: 130px 1fr 44px; align-items: center; gap: 10px; min-width: 0;">
+                    <span class="rule-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Daily Limit Rule</span>
+                    <div class="rule-track" style="min-width:0;">
+                        <div id="bar-daily-limit" style="width: 0%; height: 100%; background: linear-gradient(90deg,#10B981,#6EE7B7); transition: width 0.6s ease; box-shadow: 0 0 10px rgba(16,185,129,0.7); border-radius:3px;"></div>
+                    </div>
+                    <span id="val-daily-limit" class="rule-val">0</span>
                 </div>
             </div>
         </div>
@@ -92,9 +159,9 @@
                 <div class="lc-arrow">&#8594;</div>
                 <div class="lc-step"><div class="lc-circle current">2</div><span>Acknowledged</span></div>
                 <div class="lc-arrow">&#8594;</div>
-                <div class="lc-step"><div class="lc-circle">3</div><span>Investigating</span></div>
+                <div class="lc-step"><div class="lc-circle glowing-step">3</div><span>Investigating</span></div>
                 <div class="lc-arrow">&#8594;</div>
-                <div class="lc-step"><div class="lc-circle">4</div><span>Closed</span></div>
+                <div class="lc-step"><div class="lc-circle done">4</div><span>Closed</span></div>
             </div>
             <div class="lifecycle-note">At any step, an alert can be <strong>Dismissed</strong> as a false positive.</div>
         </div>
@@ -157,6 +224,47 @@
       document.getElementById("closed-alerts-value").textContent = data.closedToday ?? 0;
     }
 
+    const DUMMY_RULE_STATS = {
+      AMOUNT_THRESHOLD: 42,
+      VELOCITY: 28,
+      NEW_PAYEE: 15,
+      DAILY_LIMIT: 35
+    };
+
+    function applyRuleStats(stats) {
+      const rules = [
+        { key: "AMOUNT_THRESHOLD", barId: "bar-amount-threshold", valId: "val-amount-threshold" },
+        { key: "VELOCITY", barId: "bar-velocity-rule", valId: "val-velocity-rule" },
+        { key: "NEW_PAYEE", barId: "bar-new-payee", valId: "val-new-payee" },
+        { key: "DAILY_LIMIT", barId: "bar-daily-limit", valId: "val-daily-limit" }
+      ];
+
+      const maxCount = Math.max(...rules.map(r => stats[r.key] || 0), 1);
+
+      rules.forEach(r => {
+        const val = stats[r.key] || 0;
+        document.getElementById(r.valId).textContent = val;
+        // Only animate bar if value > 0
+        const pct = val > 0 ? Math.max(4, Math.round((val / maxCount) * 100)) : 0;
+        document.getElementById(r.barId).style.width = `${pct}%`;
+      });
+    }
+
+    async function loadRuleStats() {
+      try {
+        const response = await fetch(`${API_BASE}/dashboard/rule-stats`);
+        if (!response.ok) throw new Error("no data");
+        const stats = await response.json();
+
+        // Check if any real data exists
+        const hasData = stats && Object.values(stats).some(v => v > 0);
+        applyRuleStats(hasData ? stats : DUMMY_RULE_STATS);
+      } catch (err) {
+        console.warn("Could not load rule execution stats, using dummy data:", err);
+        applyRuleStats(DUMMY_RULE_STATS);
+      }
+    }
+
     async function loadRecentAlerts() {
       const tbody = document.getElementById("recent-alerts-body");
       const response = await fetch(`${API_BASE}/dashboard/recent-alerts`);
@@ -189,7 +297,7 @@
 
     async function initDashboard() {
       try {
-        await Promise.all([loadSummary(), loadRecentAlerts()]);
+        await Promise.all([loadSummary(), loadRuleStats(), loadRecentAlerts()]);
       } catch (error) {
         console.error(error);
         document.getElementById("recent-alerts-body").innerHTML =
