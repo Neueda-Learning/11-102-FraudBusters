@@ -1,0 +1,11 @@
+target/
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+*.log
+.DS_Store
+
+# Maven wrapper cache/OS noise
+.mvn/wrapper/maven-wrapper.jar.*

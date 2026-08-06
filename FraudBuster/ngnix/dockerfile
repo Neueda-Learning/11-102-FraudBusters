@@ -1,0 +1,11 @@
+# ---------- Nginx stage ----------
+FROM nginx:alpine
+
+WORKDIR /usr/share/nginx/html
+
+# Copy all static frontend pages and assets.
+COPY ./*.html ./
+COPY ./dashboard.html ./index.html
+COPY ./styles.css ./
+
+EXPOSE 80
