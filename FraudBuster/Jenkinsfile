@@ -12,8 +12,7 @@ pipeline {
 
         stage('Checkout Source') {
             steps {
-                git branch: "${BRANCH}",
-                    url: "${GIT_URL}"
+                checkout scm
             }
         }
 
