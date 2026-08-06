@@ -4,6 +4,7 @@ import com.FraudBusters.TransactionMonitoring.models.AlertEntity;
 import com.FraudBusters.TransactionMonitoring.models.AlertTransactionEntity;
 import com.FraudBusters.TransactionMonitoring.models.RuleEntity;
 import com.FraudBusters.TransactionMonitoring.models.TransactionEntity;
+import com.FraudBusters.TransactionMonitoring.models.dto.TransactionRequestDTO;
 import com.FraudBusters.TransactionMonitoring.models.enums.*;
 import com.FraudBusters.TransactionMonitoring.repository.AlertEntityRepository;
 import com.FraudBusters.TransactionMonitoring.repository.AlertTransactionEntityRepo;
@@ -11,6 +12,7 @@ import com.FraudBusters.TransactionMonitoring.repository.TransactionDecisionEnti
 import com.FraudBusters.TransactionMonitoring.repository.RuleEntityRepository;
 import com.FraudBusters.TransactionMonitoring.repository.TransactionEntityRepository;
 import com.FraudBusters.TransactionMonitoring.services.RuleEngineService;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -36,10 +38,18 @@ public class DailyLimitRuleEngineServiceImpl implements RuleEngineService {
     private AlertTransactionEntityRepo alertTransactionEntityRepository;
     @Autowired
     private TransactionDecisionEntityRepo transactionDecisionEntityRepo;
+    @Autowired
+    private ModelMapper modelMapper;
 
     private static final Pattern DAILY_LIMIT_PATTERN =
             Pattern.compile("\\\"dailyLimitAmount\\\"\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)");
 
+
+
+    public Optional<Boolean> evaluateTransaction(TransactionRequestDTO transactionRequestDTO) {
+        TransactionEntity transactionEntity = modelMapper.map(transactionRequestDTO, TransactionEntity.class);
+        return Optional.of(evaluateTransaction(transactionEntity));
+    }
 
     @Override
     public boolean evaluateTransaction(TransactionEntity transaction) {
@@ -86,11 +96,13 @@ public class DailyLimitRuleEngineServiceImpl implements RuleEngineService {
             transactionEntityRepository.save(resolvedTransaction);
 
             AlertEntity alertEntity = new AlertEntity();
-            alertEntity.setTitle("Daily Limit Exceeded");
-            alertEntity.setDescription("Account " + resolvedTransaction.getAccountId() +
-                    " has spent " + projectedDailyTotal + " today, exceeding the daily limit of " + dailyLimitAmount);
+            String contextDescription = "Account " + resolvedTransaction.getAccountId()
+                    + " projected daily total " + projectedDailyTotal
+                    + " exceeds configured daily limit " + dailyLimitAmount;
+            alertEntity.setTitle(resolveRuleTitle(dailyLimitRule, "Daily Limit Exceeded"));
+            alertEntity.setDescription(buildRuleDescription(dailyLimitRule, contextDescription));
             alertEntity.setAlertCode("DL-" + System.currentTimeMillis());
-            alertEntity.setSeverity(SeverityLevel.HIGH);
+            alertEntity.setSeverity(dailyLimitRule.getSeverityDefault());
             alertEntity.setRule(dailyLimitRule);
             alertEntity.setStatus(AlertStatus.OPEN);
             alertEntity.setCreatedAt(LocalDateTime.now());
@@ -106,6 +118,11 @@ public class DailyLimitRuleEngineServiceImpl implements RuleEngineService {
 
             alertTransactionEntityRepository.save(alertTransactionEntity);
             return true;
+        }
+
+        // Do not override a hold created by another rule in multi-rule orchestration.
+        if (MonitorState.HELD.equals(resolvedTransaction.getMonitorState())) {
+            return false;
         }
 
         resolvedTransaction.setMonitorState(MonitorState.RELEASED);
@@ -132,6 +149,19 @@ public class DailyLimitRuleEngineServiceImpl implements RuleEngineService {
         }
 
         return new BigDecimal(matcher.group(1));
+    }
+
+    private String resolveRuleTitle(RuleEntity ruleEntity, String fallbackTitle) {
+        return (ruleEntity.getName() == null || ruleEntity.getName().isBlank())
+                ? fallbackTitle
+                : ruleEntity.getName();
+    }
+
+    private String buildRuleDescription(RuleEntity ruleEntity, String contextDescription) {
+        if (ruleEntity.getDescription() == null || ruleEntity.getDescription().isBlank()) {
+            return contextDescription;
+        }
+        return ruleEntity.getDescription() + " | " + contextDescription;
     }
 
 }

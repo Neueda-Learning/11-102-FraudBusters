@@ -4,16 +4,17 @@ import com.FraudBusters.TransactionMonitoring.models.AlertEntity;
 import com.FraudBusters.TransactionMonitoring.models.AlertTransactionEntity;
 import com.FraudBusters.TransactionMonitoring.models.RuleEntity;
 import com.FraudBusters.TransactionMonitoring.models.TransactionEntity;
+import com.FraudBusters.TransactionMonitoring.models.dto.TransactionRequestDTO;
 import com.FraudBusters.TransactionMonitoring.models.enums.AlertRelationType;
 import com.FraudBusters.TransactionMonitoring.models.enums.AlertStatus;
 import com.FraudBusters.TransactionMonitoring.models.enums.FinalDecision;
 import com.FraudBusters.TransactionMonitoring.models.enums.MonitorState;
-import com.FraudBusters.TransactionMonitoring.models.enums.SeverityLevel;
 import com.FraudBusters.TransactionMonitoring.repository.AlertEntityRepository;
 import com.FraudBusters.TransactionMonitoring.repository.AlertTransactionEntityRepo;
 import com.FraudBusters.TransactionMonitoring.repository.RuleEntityRepository;
 import com.FraudBusters.TransactionMonitoring.repository.TransactionEntityRepository;
 import com.FraudBusters.TransactionMonitoring.services.RuleEngineService;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -34,13 +35,20 @@ public class AmountThresholdRuleEngineServiceImpl implements RuleEngineService {
     private TransactionEntityRepository transactionEntityRepository;
     @Autowired
     private AlertTransactionEntityRepo alertTransactionEntityRepository;
+    @Autowired
+    private ModelMapper modelMapper;
 
     private static final Pattern THRESHOLD_PATTERN =
-            Pattern.compile("\\\"thresholdAmount\\\"\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)");
+            Pattern.compile("\"thresholdAmount\"\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)");
 
 
     //implement  evaluateTransactionUsingAmountThreshold method to check if the transaction amount exceeds the threshold defined in the AMOUNT_THRESHOLD rule. If it does, create an alert and associate it with the transaction. If not, update the transaction state to RELEASED and set the final decision to ALLOW.
 
+
+    public Optional<Boolean> evaluateTransaction(TransactionRequestDTO transactionRequestDTO) {
+        TransactionEntity transactionEntity = modelMapper.map(transactionRequestDTO, TransactionEntity.class);
+        return Optional.of(evaluateTransaction(transactionEntity));
+    }
 
     @Override
     public boolean evaluateTransaction(TransactionEntity transaction) {
@@ -74,10 +82,12 @@ public class AmountThresholdRuleEngineServiceImpl implements RuleEngineService {
             transactionEntityRepository.save(resolvedTransaction);
 
             AlertEntity alertEntity = new AlertEntity();
-            alertEntity.setTitle("High Amount Transaction Detected");
-            alertEntity.setDescription("Transaction amount exceeds the defined threshold of " + thresholdAmount);
+            String contextDescription = "Transaction amount " + resolvedTransaction.getAmount()
+                    + " exceeds configured threshold " + thresholdAmount;
+            alertEntity.setTitle(resolveRuleTitle(amountThresholdRule, "High Amount Transaction Detected"));
+            alertEntity.setDescription(buildRuleDescription(amountThresholdRule, contextDescription));
             alertEntity.setAlertCode("AMT-" + System.currentTimeMillis());
-            alertEntity.setSeverity(SeverityLevel.HIGH);
+            alertEntity.setSeverity(amountThresholdRule.getSeverityDefault());
             alertEntity.setRule(amountThresholdRule);
             alertEntity.setStatus(AlertStatus.OPEN);
             alertEntity.setCreatedAt(LocalDateTime.now());
@@ -93,6 +103,11 @@ public class AmountThresholdRuleEngineServiceImpl implements RuleEngineService {
 
             alertTransactionEntityRepository.save(alertTransactionEntity);
             return true;
+        }
+
+        // Do not override a hold created by another rule in multi-rule orchestration.
+        if (MonitorState.HELD.equals(resolvedTransaction.getMonitorState())) {
+            return false;
         }
 
         resolvedTransaction.setMonitorState(MonitorState.RELEASED);
@@ -117,5 +132,18 @@ public class AmountThresholdRuleEngineServiceImpl implements RuleEngineService {
         }
 
         return new BigDecimal(matcher.group(1));
+    }
+
+    private String resolveRuleTitle(RuleEntity ruleEntity, String fallbackTitle) {
+        return (ruleEntity.getName() == null || ruleEntity.getName().isBlank())
+                ? fallbackTitle
+                : ruleEntity.getName();
+    }
+
+    private String buildRuleDescription(RuleEntity ruleEntity, String contextDescription) {
+        if (ruleEntity.getDescription() == null || ruleEntity.getDescription().isBlank()) {
+            return contextDescription;
+        }
+        return ruleEntity.getDescription() + " | " + contextDescription;
     }
 }

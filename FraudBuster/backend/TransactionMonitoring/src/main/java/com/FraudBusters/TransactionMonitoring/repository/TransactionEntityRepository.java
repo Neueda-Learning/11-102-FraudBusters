@@ -1,6 +1,8 @@
 package com.FraudBusters.TransactionMonitoring.repository;
 
 import com.FraudBusters.TransactionMonitoring.models.TransactionEntity;
+import com.FraudBusters.TransactionMonitoring.models.enums.FinalDecision;
+import com.FraudBusters.TransactionMonitoring.models.enums.MonitorState;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,4 +35,9 @@ public interface TransactionEntityRepository extends JpaRepository<TransactionEn
             @Param("accountId") String accountId,
             @Param("startOfDay") LocalDateTime startOfDay,
             @Param("endOfDay") LocalDateTime endOfDay);
+
+    /** Polling helper for continuous evaluation workers. */
+    List<TransactionEntity> findTop100ByMonitorStateAndFinalDecisionOrderByTxnTimestampAsc(
+            MonitorState monitorState,
+            FinalDecision finalDecision);
 }
