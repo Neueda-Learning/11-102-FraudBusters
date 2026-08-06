@@ -1,5 +1,7 @@
 package com.FraudBusters.TransactionMonitoring.services.Impl;
 
+import com.FraudBusters.TransactionMonitoring.exceptions.InvalidAlertTransitionException;
+import com.FraudBusters.TransactionMonitoring.exceptions.InvalidLifecycleActionException;
 import com.FraudBusters.TransactionMonitoring.exceptions.ResourceNotFoundException;
 import com.FraudBusters.TransactionMonitoring.models.AlertEntity;
 import com.FraudBusters.TransactionMonitoring.models.AlertStatusHistoryEntity;
@@ -25,6 +27,10 @@ import java.util.List;
 
 @Service
 public class AlertLifecycleServiceImpl implements AlertLifecycleService {
+
+    private static final String DEFAULT_DECIDED_BY = "operator-1";
+    private static final String DEFAULT_ACKNOWLEDGE_REASON = "Operator acknowledged the alert.";
+    private static final String DEFAULT_INVESTIGATE_REASON = "Operator started investigation.";
 
     @Autowired
     private AlertEntityRepository alertEntityRepository;
@@ -55,7 +61,10 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
      */
     @Override
     @Transactional
-    public void acknowledgeAlert(String alertCode) {
+    public void acknowledgeAlert(String alertCode, String reason, String decidedBy) {
+        String safeDecidedBy = normalizeDecidedBy(decidedBy);
+        String safeReason = normalizeOptionalReason(reason, DEFAULT_ACKNOWLEDGE_REASON);
+
         // Step 1: fetch alert by business code
         AlertEntity alert = findAlertOrThrow(alertCode);
 
@@ -74,8 +83,8 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
                 alert,
                 oldStatus,
                 AlertStatus.ACKNOWLEDGED,
-                "operator-1",
-                "Operator acknowledged the alert."
+                safeDecidedBy,
+                safeReason
         );
     }
 
@@ -93,7 +102,10 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
      */
     @Override
     @Transactional
-    public void investigateAlert(String alertCode) {
+    public void investigateAlert(String alertCode, String reason, String decidedBy) {
+        String safeDecidedBy = normalizeDecidedBy(decidedBy);
+        String safeReason = normalizeOptionalReason(reason, DEFAULT_INVESTIGATE_REASON);
+
         // Step 1: fetch alert by business code
         AlertEntity alert = findAlertOrThrow(alertCode);
 
@@ -112,8 +124,8 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
                 alert,
                 oldStatus,
                 AlertStatus.INVESTIGATING,
-                "operator-1",
-                "Operator started investigation."
+                safeDecidedBy,
+                safeReason
         );
     }
 
@@ -138,6 +150,9 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
     @Override
     @Transactional
     public void closeAlert(String alertCode, String reason, String decidedBy) {
+        String safeDecidedBy = normalizeDecidedBy(decidedBy);
+        String safeReason = normalizeRequiredReason(reason, "close");
+
         // Step 1: fetch alert
         AlertEntity alert = findAlertOrThrow(alertCode);
 
@@ -150,15 +165,15 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
         // Step 4: update alert — set CLOSED state and save closure metadata
         alert.setStatus(AlertStatus.CLOSED);
         alert.setClosedAt(LocalDateTime.now());
-        alert.setClosureReason(reason);
+        alert.setClosureReason(safeReason);
         alertEntityRepository.save(alert);
 
         // Step 5: record status transition in history
-        insertStatusHistory(alert, oldStatus, AlertStatus.CLOSED, decidedBy, reason);
+        insertStatusHistory(alert, oldStatus, AlertStatus.CLOSED, safeDecidedBy, safeReason);
 
         // Step 6: write DECLINE decision for each transaction linked to this alert
         //         and mirror the final result onto the transactions table
-        recordDecisionForLinkedTransactions(alert, DecisionType.DECLINE, decidedBy, reason);
+        recordDecisionForLinkedTransactions(alert, DecisionType.DECLINE, safeDecidedBy, safeReason);
     }
 
     // ---------------------------------------------------------------
@@ -183,6 +198,9 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
     @Override
     @Transactional
     public void dismissAlert(String alertCode, String reason, String decidedBy) {
+        String safeDecidedBy = normalizeDecidedBy(decidedBy);
+        String safeReason = normalizeRequiredReason(reason, "dismiss");
+
         // Step 1: fetch alert
         AlertEntity alert = findAlertOrThrow(alertCode);
 
@@ -195,15 +213,15 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
         // Step 4: update alert — set DISMISSED state and save closure metadata
         alert.setStatus(AlertStatus.DISMISSED);
         alert.setClosedAt(LocalDateTime.now());
-        alert.setClosureReason(reason);
+        alert.setClosureReason(safeReason);
         alertEntityRepository.save(alert);
 
         // Step 5: record status transition in history
-        insertStatusHistory(alert, oldStatus, AlertStatus.DISMISSED, decidedBy, reason);
+        insertStatusHistory(alert, oldStatus, AlertStatus.DISMISSED, safeDecidedBy, safeReason);
 
         // Step 6: write ALLOW decision for each transaction linked to this alert
         //         and mirror the final result onto the transactions table
-        recordDecisionForLinkedTransactions(alert, DecisionType.ALLOW, decidedBy, reason);
+        recordDecisionForLinkedTransactions(alert, DecisionType.ALLOW, safeDecidedBy, safeReason);
     }
 
     // ---------------------------------------------------------------
@@ -221,7 +239,7 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
 
     /**
      * Validates a strict one-step transition.
-     * If alert is not in expectedCurrent status, throws IllegalStateException.
+     * If alert is not in expectedCurrent status, throws InvalidAlertTransitionException.
      *
      * Example: acknowledge requires OPEN. If alert is INVESTIGATING, this throws.
      */
@@ -229,7 +247,7 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
                                           AlertStatus expectedCurrent,
                                           AlertStatus target) {
         if (alert.getStatus() != expectedCurrent) {
-            throw new IllegalStateException(
+            throw new InvalidAlertTransitionException(
                     "Cannot move alert to " + target
                     + ". Current status is " + alert.getStatus()
                     + ", but expected " + expectedCurrent + ".");
@@ -244,9 +262,42 @@ public class AlertLifecycleServiceImpl implements AlertLifecycleService {
     private void validateDismissTransition(AlertEntity alert) {
         AlertStatus current = alert.getStatus();
         if (current == AlertStatus.CLOSED || current == AlertStatus.DISMISSED) {
-            throw new IllegalStateException(
+            throw new InvalidAlertTransitionException(
                     "Cannot dismiss alert. It is already in terminal status: " + current);
         }
+    }
+
+    private String normalizeDecidedBy(String decidedBy) {
+        if (decidedBy == null || decidedBy.isBlank()) {
+            return DEFAULT_DECIDED_BY;
+        }
+        String trimmed = decidedBy.trim();
+        if (trimmed.length() > 100) {
+            throw new InvalidLifecycleActionException("decidedBy cannot exceed 100 characters.");
+        }
+        return trimmed;
+    }
+
+    private String normalizeOptionalReason(String reason, String defaultReason) {
+        if (reason == null || reason.isBlank()) {
+            return defaultReason;
+        }
+        String trimmed = reason.trim();
+        if (trimmed.length() > 500) {
+            throw new InvalidLifecycleActionException("reason cannot exceed 500 characters.");
+        }
+        return trimmed;
+    }
+
+    private String normalizeRequiredReason(String reason, String actionName) {
+        if (reason == null || reason.isBlank()) {
+            throw new InvalidLifecycleActionException("Reason is required for " + actionName + " action.");
+        }
+        String trimmed = reason.trim();
+        if (trimmed.length() > 500) {
+            throw new InvalidLifecycleActionException("reason cannot exceed 500 characters.");
+        }
+        return trimmed;
     }
 
     /**
