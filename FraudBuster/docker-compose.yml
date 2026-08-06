@@ -42,8 +42,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: dockerfile
+      context: ./ngnix/frontend
+      dockerfile: ../dockerfile
     container_name: fraudbusters-frontend
     restart: unless-stopped
     depends_on:
