@@ -19,16 +19,20 @@ public interface AlertLifecycleService {
      * Transition: OPEN -> ACKNOWLEDGED
      *
      * @param alertCode business-facing alert identifier (e.g. "AMT-1234567890")
+     * @param reason optional audit note for status history
+     * @param decidedBy operator name captured from frontend or defaulted by controller
      */
-    void acknowledgeAlert(String alertCode);
+    void acknowledgeAlert(String alertCode, String reason, String decidedBy);
 
     /**
      * Operator starts active investigation on the alert.
      * Transition: ACKNOWLEDGED -> INVESTIGATING
      *
      * @param alertCode business-facing alert identifier
+     * @param reason optional audit note for status history
+     * @param decidedBy operator name captured from frontend or defaulted by controller
      */
-    void investigateAlert(String alertCode);
+    void investigateAlert(String alertCode, String reason, String decidedBy);
 
     /**
      * Operator closes the alert after confirming fraud.
