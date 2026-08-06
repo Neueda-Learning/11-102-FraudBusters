@@ -226,6 +226,12 @@ body {
 
 .btn:hover { transform: translateY(-1px); }
 .btn:active { transform: translateY(0); }
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
 
 .btn-primary   { background: var(--accent); color: #FFFFFF; box-shadow: var(--shadow-blue); }
 .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 4px 22px rgba(59, 130, 246, 0.6); }
@@ -477,6 +483,7 @@ tbody tr:hover td { background: var(--bg-soft); }
 }
 .st-open          { background: var(--red-pale); color: #FCA5A5; border: 1px solid var(--red-border); }
 .st-acknowledged  { background: var(--yellow-pale); color: #FCD34D; border: 1px solid var(--yellow-border); }
+.st-ack           { background: var(--yellow-pale); color: #FCD34D; border: 1px solid var(--yellow-border); }
 .st-investigating { background: var(--violet-pale); color: #C4B5FD; border: 1px solid var(--violet-border); }
 .st-closed        { background: var(--green-pale); color: #6EE7B7; border: 1px solid var(--green-border); }
 .st-dismissed     { background: var(--bg-soft); color: var(--text-secondary); border: 1px solid var(--border-strong); }
@@ -596,6 +603,58 @@ tbody tr:hover td { background: var(--bg-soft); }
 }
 
 .action-group { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.notes-wrap { margin-top: 12px; }
+
+.alert-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding: 10px 12px 14px;
+  border-top: 1px solid var(--border);
+  gap: 10px;
+}
+
+.alert-page-info {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.contact-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 16px;
+}
+
+.contact-modal-card {
+  width: min(92vw, 460px);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 18px;
+}
+
+.contact-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+
+.contact-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
 
 textarea {
   width: 100%;
@@ -912,3 +971,4 @@ footer {
   .rule-card-actions { align-items: stretch; min-width: 0; }
   .modal-actions { flex-direction: column-reverse; }
 }}
+}

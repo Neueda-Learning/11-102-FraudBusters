@@ -62,6 +62,11 @@
                 <tr><td colspan="4" style="color:var(--text-muted);">Loading alerts...</td></tr>
                 </tbody>
             </table>
+            <div id="alert-pagination" class="alert-pagination">
+                <button class="btn btn-secondary" id="alert-page-prev" type="button">Previous</button>
+                <div id="alert-page-info" class="alert-page-info">Page 1 of 1</div>
+                <button class="btn btn-secondary" id="alert-page-next" type="button">Next</button>
+            </div>
         </div>
 
         <div id="alert-detail" class="alert-detail">
@@ -73,7 +78,6 @@
             <div class="detail-row"><span class="key">Amount</span><span class="val val-alert" id="d-amount">-</span></div>
             <div class="detail-row"><span class="key">Payee</span><span class="val" id="d-payee">-</span></div>
             <div class="detail-row"><span class="key">Created At</span><span class="val" id="d-created">-</span></div>
-            <div class="detail-row"><span class="key">Threshold</span><span class="val" id="d-threshold">-</span></div>
 
             <div class="caps-title">Related Transaction</div>
             <table>
@@ -88,20 +92,41 @@
             </table>
 
             <div class="caps-title">Actions</div>
-            <div class="action-group">
-                <button class="btn btn-ack" type="button" onclick="alert('Action endpoint can be wired next.')">Acknowledge</button>
-                <button class="btn btn-inv" type="button" onclick="alert('Action endpoint can be wired next.')">Investigate</button>
-                <button class="btn btn-close" type="button" onclick="alert('Action endpoint can be wired next.')">Close</button>
-                <button class="btn btn-dismiss" type="button" onclick="alert('Action endpoint can be wired next.')">Dismiss</button>
+            <div id="lifecycle-action-group" class="action-group">
+                <button class="btn btn-ack" id="btn-acknowledge" type="button">Acknowledge</button>
+                <button class="btn btn-inv" id="btn-investigate" type="button">Investigate</button>
+                <button class="btn btn-close" id="btn-close-alert" type="button">Close</button>
+                <button class="btn btn-dismiss" id="btn-dismiss-alert" type="button">Dismiss</button>
             </div>
-            <div style="margin-top:12px;">
+            <div id="terminal-action-copy" class="sub" style="display:none;margin-top:10px;">This alert is already in a terminal state. No further lifecycle actions are available.</div>
+            <div class="action-group" style="margin-top:10px;">
+                <button class="btn btn-secondary" id="btn-contact-user" type="button" onclick="openContactDialog()">Contact User</button>
+            </div>
+            <div class="notes-wrap">
+                <label class="sr-only" for="operator-name">Operator name</label>
+                <input id="operator-name" type="text" class="input-date" placeholder="Operator name" value="operator-1" maxlength="100" style="width:100%;margin-bottom:10px;"/>
                 <label class="sr-only" for="resolution-notes">Resolution notes</label>
-                <textarea id="resolution-notes" placeholder="Add resolution notes here..."></textarea>
+                <textarea id="resolution-notes" maxlength="500" placeholder="Add resolution notes here..."></textarea>
             </div>
+            <div id="action-feedback" class="sub" style="margin-top:10px;display:none;"></div>
+            <div id="action-help-text" class="sub" style="margin-top:10px;">Action buttons change as per the selected alert status.</div>
         </div>
     </div>
 
     <footer>TxMonitor MVP &mdash; Transaction Monitoring &amp; Alerts System</footer>
+</div>
+
+<div id="contact-modal" class="contact-modal" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title">
+    <div class="contact-modal-card">
+        <div class="contact-modal-header">
+            <h3 id="contact-modal-title">Contact User</h3>
+            <button class="btn btn-secondary" type="button" onclick="closeContactDialog()">Close</button>
+        </div>
+        <div class="detail-row"><span class="key">Name</span><span class="val" id="contact-name">Not available</span></div>
+        <div class="detail-row"><span class="key">Email</span><span class="val" id="contact-email">Not available</span></div>
+        <div class="detail-row"><span class="key">Phone</span><span class="val" id="contact-phone">Not available</span></div>
+        <div class="detail-row"><span class="key">Account</span><span class="val" id="contact-account">Not available</span></div>
+    </div>
 </div>
 
 <script>
@@ -110,6 +135,20 @@
     let alertsData = [];
     let selectedAlertCode = null;
     let activeFilter = "all";
+    let currentPage = 0;
+    const PAGE_SIZE = 10;
+    let totalPages = 0;
+    let hasPreviousPage = false;
+    let hasNextPage = false;
+    let detailAlertCode = null;
+    let isActionLoading = false;
+
+    const ACTION_BUTTON_CONFIG = {
+      acknowledge: { id: "btn-acknowledge", statuses: ["OPEN"] },
+      investigate: { id: "btn-investigate", statuses: ["ACKNOWLEDGED"] },
+      close: { id: "btn-close-alert", statuses: ["INVESTIGATING"] },
+      dismiss: { id: "btn-dismiss-alert", statuses: ["OPEN", "ACKNOWLEDGED", "INVESTIGATING"] }
+    };
 
     function toSentence(value) {
       return (value || "").toLowerCase().replace(/(^|\s)\S/g, function (m) { return m.toUpperCase(); });
@@ -120,9 +159,35 @@
       return new Date(value).toLocaleString();
     }
 
+    function normalizeStatus(value) {
+      return String(value || "").trim().toUpperCase();
+    }
+
+    function buildCounts(payload, alerts) {
+      const list = Array.isArray(alerts) ? alerts : [];
+      const derived = {
+        total: list.length,
+        open: list.filter(function (a) { return normalizeStatus(a.status) === "OPEN"; }).length,
+        ack: list.filter(function (a) { return normalizeStatus(a.status) === "ACKNOWLEDGED"; }).length,
+        inv: list.filter(function (a) { return normalizeStatus(a.status) === "INVESTIGATING"; }).length
+      };
+
+      const readNumber = function (value, fallback) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+      };
+
+      return {
+        total: readNumber(payload.totalAlerts, derived.total),
+        open: readNumber(payload.openAlerts, derived.open),
+        ack: readNumber(payload.acknowledgedAlerts, derived.ack),
+        inv: readNumber(payload.investigatingAlerts, derived.inv)
+      };
+    }
+
     function rowMatchesFilter(alert) {
       if (activeFilter === "all") return true;
-      return (alert.status || "") === activeFilter;
+      return normalizeStatus(alert.status) === activeFilter;
     }
 
     function rowMatchesSearch(alert, query) {
@@ -159,8 +224,18 @@
       });
 
       if (filtered.length === 0) {
+        selectedAlertCode = null;
+        renderEmptyDetail();
         tbody.innerHTML = `<tr><td colspan="4" style="color:var(--text-muted);">No alerts found.</td></tr>`;
+        document.getElementById("alert-page-info").textContent = totalPages === 0 ? "Page 0 of 0" : `Page ${currentPage + 1} of ${totalPages}`;
+        document.getElementById("alert-page-prev").disabled = !hasPreviousPage;
+        document.getElementById("alert-page-next").disabled = !hasNextPage;
         return;
+      }
+
+      if (!filtered.some(function (a) { return a.alertCode === selectedAlertCode; })) {
+        selectedAlertCode = filtered[0].alertCode;
+        renderDetail(filtered[0]);
       }
 
       tbody.innerHTML = filtered.map(function (a) {
@@ -170,9 +245,13 @@
             <td>${a.alertCode || "-"}</td>
             <td><span class="severity-badge ${a.severityClass || "sev-low"}">${toSentence(a.severity || "LOW")}</span></td>
             <td>${a.ruleName || "-"}</td>
-            <td><span class="status-badge ${a.statusClass || "st-open"}">${toSentence(a.status || "OPEN")}</span></td>
+            <td><span class="status-badge ${a.statusClass || "st-open"}">${toSentence(normalizeStatus(a.status) || "OPEN")}</span></td>
           </tr>`;
       }).join("");
+
+      document.getElementById("alert-page-info").textContent = totalPages === 0 ? "Page 0 of 0" : `Page ${currentPage + 1} of ${totalPages}`;
+      document.getElementById("alert-page-prev").disabled = !hasPreviousPage;
+      document.getElementById("alert-page-next").disabled = !hasNextPage;
 
       Array.from(tbody.querySelectorAll("tr[data-alert-code]")).forEach(function (row) {
         row.addEventListener("click", function () {
@@ -187,69 +266,338 @@
       });
     }
 
+    function allowedActionsForStatus(status) {
+      const normalized = normalizeStatus(status);
+      if (normalized === "OPEN") return ["acknowledge", "dismiss"];
+      if (normalized === "ACKNOWLEDGED") return ["investigate", "dismiss"];
+      if (normalized === "INVESTIGATING") return ["close", "dismiss"];
+      return [];
+    }
+
+    function getSelectedAlert() {
+      return alertsData.find(function (a) { return a.alertCode === selectedAlertCode; }) || null;
+    }
+
+    function setActionFeedback(message, tone) {
+      const feedback = document.getElementById("action-feedback");
+      if (!feedback) return;
+      if (!message) {
+        feedback.style.display = "none";
+        feedback.textContent = "";
+        feedback.style.color = "";
+        return;
+      }
+      feedback.style.display = "block";
+      feedback.textContent = message;
+      feedback.style.color = tone === "error" ? "#FCA5A5" : (tone === "success" ? "#6EE7B7" : "var(--text-secondary)");
+    }
+
+    function setActionControlsDisabled(disabled) {
+      isActionLoading = disabled;
+      Object.keys(ACTION_BUTTON_CONFIG).forEach(function (actionName) {
+        const button = document.getElementById(ACTION_BUTTON_CONFIG[actionName].id);
+        if (button) {
+          button.disabled = disabled || button.hidden;
+        }
+      });
+      const operatorInput = document.getElementById("operator-name");
+      const notesInput = document.getElementById("resolution-notes");
+      if (operatorInput) operatorInput.disabled = disabled;
+      if (notesInput) notesInput.disabled = disabled;
+    }
+
+    function clearActionInputs() {
+      const notesInput = document.getElementById("resolution-notes");
+      if (notesInput) {
+        notesInput.value = "";
+      }
+    }
+
+    function validateActionPayload(actionName) {
+      const operatorInput = document.getElementById("operator-name");
+      const notesInput = document.getElementById("resolution-notes");
+      const decidedBy = operatorInput ? operatorInput.value.trim() : "";
+      const reason = notesInput ? notesInput.value.trim() : "";
+
+      if (decidedBy.length > 100) {
+        if (operatorInput) operatorInput.focus();
+        throw new Error("Operator name 100 characters se zyada nahi ho sakta.");
+      }
+
+      if (reason.length > 500) {
+        if (notesInput) notesInput.focus();
+        throw new Error("Notes 500 characters se zyada nahi ho sakte.");
+      }
+
+      if ((actionName === "close" || actionName === "dismiss") && !reason) {
+        if (notesInput) notesInput.focus();
+        throw new Error("Close aur Dismiss ke liye note dena mandatory hai.");
+      }
+
+      return {
+        decidedBy: decidedBy || "operator-1",
+        reason: reason
+      };
+    }
+
+    async function submitLifecycleAction(actionName) {
+      const selected = getSelectedAlert();
+      if (!selected) {
+        setActionFeedback("Koi alert selected nahi hai. Pehle list me se alert select karo.", "error");
+        return;
+      }
+
+      const allowedActions = allowedActionsForStatus(selected.status);
+      if (allowedActions.indexOf(actionName) === -1) {
+        setActionFeedback(`Current status ${toSentence(selected.status)} ke liye ${toSentence(actionName)} allowed nahi hai.`, "error");
+        return;
+      }
+
+      let payload;
+      try {
+        payload = validateActionPayload(actionName);
+      } catch (error) {
+        setActionFeedback(error.message || "Action validation failed.", "error");
+        return;
+      }
+
+      const endpoint = `${API_BASE}/alerts/${encodeURIComponent(selected.alertCode)}/${actionName}`;
+      setActionFeedback(`${toSentence(actionName)} action process ho raha hai...`, "info");
+      setActionControlsDisabled(true);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const responseText = (await response.text()).trim();
+        if (!response.ok) {
+          throw new Error(responseText || `Action failed with status ${response.status}.`);
+        }
+
+        clearActionInputs();
+        setActionFeedback(responseText || `Alert ${toSentence(actionName)} successfully.`, "success");
+        await loadAlerts(currentPage);
+      } catch (error) {
+        console.error(error);
+        setActionFeedback(error.message || `Could not ${actionName} alert.`, "error");
+      } finally {
+        setActionControlsDisabled(false);
+      }
+    }
+
+    function renderActionButtons(alert) {
+      const allowedActions = allowedActionsForStatus(alert && alert.status);
+      const lifecycleGroup = document.getElementById("lifecycle-action-group");
+      const terminalCopy = document.getElementById("terminal-action-copy");
+      const helpText = document.getElementById("action-help-text");
+      const isAlertSelected = Boolean(alert && alert.alertCode);
+
+      Object.keys(ACTION_BUTTON_CONFIG).forEach(function (actionName) {
+        const config = ACTION_BUTTON_CONFIG[actionName];
+        const button = document.getElementById(config.id);
+        if (!button) return;
+        button.hidden = allowedActions.indexOf(actionName) === -1;
+        button.disabled = isActionLoading || button.hidden || !isAlertSelected;
+      });
+
+      const hasLifecycleActions = allowedActions.length > 0;
+      if (lifecycleGroup) {
+        lifecycleGroup.style.display = hasLifecycleActions && isAlertSelected ? "flex" : "none";
+      }
+      if (terminalCopy) {
+        terminalCopy.style.display = isAlertSelected && !hasLifecycleActions ? "block" : "none";
+      }
+      if (helpText) {
+        helpText.textContent = !isAlertSelected
+          ? "List me se alert select karo, phir uske current status ke hisaab se actions yahin dikhengi."
+          : hasLifecycleActions
+          ? `Allowed actions for ${toSentence(normalizeStatus(alert && alert.status) || "selected alert")}: ${allowedActions.map(toSentence).join(", ")}.`
+          : "This selected alert is already closed or dismissed, so only contact details are available here.";
+      }
+    }
+
+    function renderEmptyDetail() {
+      detailAlertCode = null;
+      document.getElementById("detail-title").textContent = "Alert Detail";
+      document.getElementById("d-status").textContent = "-";
+      document.getElementById("d-severity").textContent = "-";
+      document.getElementById("d-rule").textContent = "-";
+      document.getElementById("d-account").textContent = "-";
+      document.getElementById("d-amount").textContent = "-";
+      document.getElementById("d-payee").textContent = "-";
+      document.getElementById("d-created").textContent = "-";
+      document.getElementById("d-txn-id").textContent = "-";
+      document.getElementById("d-txn-amt").textContent = "-";
+      document.getElementById("d-txn-time").textContent = "-";
+      const contactButton = document.getElementById("btn-contact-user");
+      if (contactButton) {
+        contactButton.disabled = true;
+      }
+      setActionFeedback("", "info");
+      renderActionButtons(null);
+    }
+
     function renderDetail(alert) {
+      if (detailAlertCode !== alert.alertCode) {
+        clearActionInputs();
+        setActionFeedback("", "info");
+        detailAlertCode = alert.alertCode;
+      }
       document.getElementById("detail-title").textContent = `Alert Detail - ${alert.alertCode || "-"}`;
-      document.getElementById("d-status").innerHTML = `<span class="status-badge ${alert.statusClass || "st-open"}">${toSentence(alert.status || "OPEN")}</span>`;
+      document.getElementById("d-status").innerHTML = `<span class="status-badge ${alert.statusClass || "st-open"}">${toSentence(normalizeStatus(alert.status) || "OPEN")}</span>`;
       document.getElementById("d-severity").innerHTML = `<span class="severity-badge ${alert.severityClass || "sev-low"}">${toSentence(alert.severity || "LOW")}</span>`;
       document.getElementById("d-rule").textContent = alert.ruleName || "-";
       document.getElementById("d-account").textContent = alert.accountId || "-";
       document.getElementById("d-amount").textContent = alert.amount || "-";
       document.getElementById("d-payee").textContent = alert.payeeId || "-";
       document.getElementById("d-created").textContent = formatDate(alert.createdAt);
-      document.getElementById("d-threshold").textContent = alert.threshold || "-";
       document.getElementById("d-txn-id").textContent = alert.relatedTxnId || "-";
       document.getElementById("d-txn-amt").textContent = alert.relatedTxnAmount || "-";
       document.getElementById("d-txn-time").textContent = alert.relatedTxnTime || "-";
+      renderActionButtons(alert);
+
+      const contactButton = document.getElementById("btn-contact-user");
+      if (contactButton) {
+        contactButton.disabled = false;
+      }
     }
 
-    async function loadAlerts() {
-      const response = await fetch(`${API_BASE}/alerts`);
+    function contactValue(value) {
+      if (value === null || value === undefined) return "Not available";
+      const text = String(value).trim();
+      return text ? text : "Not available";
+    }
+
+    function openContactDialog() {
+      const selected = alertsData.find(function (a) { return a.alertCode === selectedAlertCode; }) || {};
+      document.getElementById("contact-name").textContent = contactValue(selected.customerFullName);
+      document.getElementById("contact-email").textContent = contactValue(selected.customerEmail);
+      document.getElementById("contact-phone").textContent = contactValue(selected.customerPhone);
+      document.getElementById("contact-account").textContent = contactValue(selected.accountId);
+      document.getElementById("contact-modal").style.display = "flex";
+    }
+
+    function closeContactDialog() {
+      document.getElementById("contact-modal").style.display = "none";
+    }
+
+    document.getElementById("btn-acknowledge").addEventListener("click", function () {
+      submitLifecycleAction("acknowledge");
+    });
+    document.getElementById("btn-investigate").addEventListener("click", function () {
+      submitLifecycleAction("investigate");
+    });
+    document.getElementById("btn-close-alert").addEventListener("click", function () {
+      submitLifecycleAction("close");
+    });
+    document.getElementById("btn-dismiss-alert").addEventListener("click", function () {
+      submitLifecycleAction("dismiss");
+    });
+
+    async function loadAlerts(pageToLoad) {
+      const targetPage = Math.max(pageToLoad || 0, 0);
+      const params = new URLSearchParams();
+      params.set("page", String(targetPage));
+      params.set("size", String(PAGE_SIZE));
+      if (activeFilter !== "all") {
+        params.set("status", activeFilter);
+      }
+
+      const response = await fetch(`${API_BASE}/alerts?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to load alerts from API");
 
-      const data = await response.json();
-      alertsData = data.alerts || [];
+      const payload = await response.json();
+      const data = (payload && typeof payload === "object") ? payload : {};
+      alertsData = Array.isArray(data.alerts) ? data.alerts : [];
+      currentPage = Number.isFinite(Number(data.page)) ? Number(data.page) : targetPage;
+      totalPages = Number.isFinite(Number(data.totalPages)) ? Number(data.totalPages) : 0;
+      hasPreviousPage = Boolean(data.hasPrevious);
+      hasNextPage = Boolean(data.hasNext);
 
-      const counts = {
-        total: data.totalAlerts || 0,
-        open: data.openAlerts || 0,
-        ack: data.acknowledgedAlerts || 0,
-        inv: data.investigatingAlerts || 0
-      };
+      if (alertsData.length === 0 && totalPages > 0 && currentPage >= totalPages) {
+        await loadAlerts(totalPages - 1);
+        return;
+      }
 
-      document.getElementById("alerts-nav-count").textContent = counts.open;
+      const counts = buildCounts(data, alertsData);
+
+      const alertsNavCount = document.getElementById("alerts-nav-count");
+      if (alertsNavCount) {
+        alertsNavCount.textContent = counts.open;
+      }
       renderTabs(counts);
 
       if (alertsData.length > 0) {
-        selectedAlertCode = alertsData[0].alertCode;
-        renderDetail(alertsData[0]);
+        if (!alertsData.some(function (a) { return a.alertCode === selectedAlertCode; })) {
+          selectedAlertCode = alertsData[0].alertCode;
+        }
+        const selected = alertsData.find(function (a) { return a.alertCode === selectedAlertCode; }) || alertsData[0];
+        renderDetail(selected);
       } else {
         selectedAlertCode = null;
+        renderEmptyDetail();
       }
 
       renderTable();
     }
 
-    document.getElementById("alert-search").addEventListener("input", renderTable);
+    document.getElementById("alert-search").addEventListener("input", function () {
+      renderTable();
+    });
     Array.from(document.querySelectorAll("#alert-tabs .tab")).forEach(function (tab) {
       tab.addEventListener("click", function () {
-        activeFilter = tab.dataset.status;
-        renderTabs({
-          total: alertsData.length,
-          open: alertsData.filter(a => a.status === "OPEN").length,
-          ack: alertsData.filter(a => a.status === "ACKNOWLEDGED").length,
-          inv: alertsData.filter(a => a.status === "INVESTIGATING").length
+        activeFilter = tab.dataset.status === "all" ? "all" : normalizeStatus(tab.dataset.status);
+        currentPage = 0;
+        selectedAlertCode = null;
+        loadAlerts(0).catch(function (error) {
+          console.error(error);
+          document.getElementById("alert-list-body").innerHTML =
+            `<tr><td colspan="4" style="color:#B91C1C;">Could not load alerts. Check backend API at ${API_BASE}.</td></tr>`;
         });
-        renderTable();
       });
     });
 
-    loadAlerts().catch(function (error) {
+    document.getElementById("alert-page-prev").addEventListener("click", function () {
+      if (hasPreviousPage) {
+        loadAlerts(currentPage - 1).catch(function (error) {
+          console.error(error);
+        });
+      }
+    });
+
+    document.getElementById("alert-page-next").addEventListener("click", function () {
+      if (hasNextPage) {
+        loadAlerts(currentPage + 1).catch(function (error) {
+          console.error(error);
+        });
+      }
+    });
+
+    loadAlerts(0).catch(function (error) {
       console.error(error);
       document.getElementById("alert-list-body").innerHTML =
         `<tr><td colspan="4" style="color:#B91C1C;">Could not load alerts. Check backend API at ${API_BASE}.</td></tr>`;
+      document.getElementById("alert-page-info").textContent = "Page 0 of 0";
+      document.getElementById("alert-page-prev").disabled = true;
+      document.getElementById("alert-page-next").disabled = true;
+    });
+
+    document.getElementById("contact-modal").addEventListener("click", function (event) {
+      if (event.target === event.currentTarget) {
+        closeContactDialog();
+      }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        closeContactDialog();
+      }
     });
 </script>
 </body>
 </html>
-
-
