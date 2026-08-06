@@ -5,7 +5,7 @@ pipeline {
     environment {
         GIT_URL = 'https://github.com/Neueda-Learning/11-102-FraudBusters.git'
         BRANCH = 'main'
-        COMPOSE_DIR = 'FraudBuster'
+        COMPOSE_FILE = 'FraudBuster/docker-compose.yml'
     }
 
     stages {
@@ -16,42 +16,43 @@ pipeline {
             }
         }
 
-        stage('Stop Existing Containers') {
+        stage('Verify Workspace') {
             steps {
-                dir("${COMPOSE_DIR}") {
-                    sh 'docker-compose down || true'
-                }
+                sh 'pwd'
+                sh 'ls -la'
+                sh 'ls -la FraudBuster || true'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Stop Existing Containers') {
             steps {
-                dir("${COMPOSE_DIR}") {
-                    sh 'docker-compose build --no-cache'
-                }
+                sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" down || true'
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" build --no-cache'
             }
         }
 
         stage('Deploy') {
             steps {
-                dir("${COMPOSE_DIR}") {
-                    sh 'docker-compose up -d'
-                }
+                sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" up -d'
             }
         }
 
         stage('Verify') {
             steps {
                 sh 'docker ps'
+                sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" ps'
             }
         }
     }
 
     post {
         always {
-            dir("${COMPOSE_DIR}") {
-                sh 'docker-compose ps || true'
-            }
+            sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" ps || true'
         }
     }
 }
