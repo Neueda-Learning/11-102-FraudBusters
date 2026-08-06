@@ -158,6 +158,50 @@ POST /api/transactions/{txnId}/decline
 POST /api/transactions/evaluate
 ```
 
+## Contract Freeze: Alerts List (`GET /api/alerts`)
+
+This contract is frozen for the current frontend list implementation in `frontend/alerts.html`.
+
+```json
+{
+  "page": 0,
+  "size": 10,
+  "totalPages": 1,
+  "totalAlerts": 0,
+  "openAlerts": 0,
+  "acknowledgedAlerts": 0,
+  "investigatingAlerts": 0,
+  "alerts": [
+    {
+      "alertCode": "ALT-001",
+      "severity": "HIGH",
+      "severityClass": "sev-high",
+      "ruleName": "Amount Threshold Rule",
+      "status": "OPEN",
+      "statusClass": "st-open",
+      "accountId": "acct_001",
+      "amount": 12500.00,
+      "payeeId": "payee_001",
+      "createdAt": "2025-01-15T09:00:00",
+      "customerFullName": "Aman Verma",
+      "customerEmail": "aman.verma@example.com",
+      "customerPhone": "+919900000101",
+      "relatedTxnId": "TXN-AMT-001",
+      "relatedTxnAmount": 12500.00,
+      "relatedTxnTime": "2025-01-15T09:00:00"
+    }
+  ]
+}
+```
+
+Notes:
+
+- Status values must be uppercase enum values: `OPEN`, `ACKNOWLEDGED`, `INVESTIGATING`.
+- `alerts` may be empty but must still be present.
+- `size` default is `10` for list pagination, and `page` is zero-based.
+- Contact fields (`customerFullName`, `customerEmail`, `customerPhone`, `accountId`) may be `null`; frontend should show `Not available` when missing.
+- Optional display fields (`severityClass`, `statusClass`) may be `null`; frontend applies fallback labels/classes.
+
 ## Mental Model
 
 ```text
