@@ -228,15 +228,22 @@ body {
 .btn:active { transform: translateY(0); }
 
 .btn-primary   { background: var(--accent); color: #FFFFFF; box-shadow: var(--shadow-blue); }
-.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:hover { background: var(--accent-hover); box-shadow: 0 4px 22px rgba(59, 130, 246, 0.6); }
 
 .btn-secondary { background: var(--bg-panel); color: var(--text-primary); border-color: var(--border-strong); box-shadow: var(--shadow-xs); }
 .btn-secondary:hover { background: var(--bg-soft); }
 
 .btn-ack       { background: var(--green); color: #FFFFFF; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25); }
-.btn-inv       { background: var(--violet); color: #FFFFFF; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.25); }
+.btn-ack:hover { box-shadow: 0 4px 16px rgba(16, 185, 129, 0.5); }
+
+.btn-inv       { background: var(--violet); color: #FFFFFF; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35); }
+.btn-inv:hover { box-shadow: 0 4px 18px rgba(139, 92, 246, 0.6); }
+
 .btn-close     { background: var(--accent); color: #FFFFFF; box-shadow: var(--shadow-blue); }
+.btn-close:hover { box-shadow: 0 4px 20px rgba(59, 130, 246, 0.65); }
+
 .btn-dismiss   { background: var(--red); color: #FFFFFF; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25); }
+.btn-dismiss:hover { box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5); }
 
 /* ── METRIC CARDS ── */
 .cards {
@@ -515,19 +522,39 @@ tbody tr:hover td { background: var(--bg-soft); }
 
 /* ── CHARTS ── */
 .chart-wrap { padding: 20px 24px 18px; }
-.chart-grid { display: flex; align-items: flex-end; gap: 12px; height: 130px; }
+.chart-grid {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 130px;
+  border-bottom: 2px solid var(--bg-soft); /* Dark slate structural base line */
+  padding-bottom: 2px;
+}
 .chart-col  { display: flex; flex-direction: column; align-items: center; flex: 1; }
+
 .bar {
   width: 100%;
   border-radius: 4px 4px 0 0;
   transition: opacity 0.15s ease;
+  background: var(--accent); /* Default fallthrough */
 }
+
+/* Semantic color mappings for chart bars */
+.bar.red    { background: var(--red); }
+.bar.yellow { background: var(--yellow); }
+.bar.green  { background: var(--green); }
+.bar.blue   { background: var(--blue); }
+
 .bar:hover   { opacity: 0.85; }
 .bar-label   { text-align: center; font-size: 11px; font-weight: 500; color: var(--text-muted); margin-top: 8px; }
 
 .legend      { display: flex; gap: 20px; margin-top: 16px; }
 .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .legend-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-swatch.red    { background: var(--red); }
+.legend-swatch.yellow { background: var(--yellow); }
+.legend-swatch.green  { background: var(--green); }
+.legend-swatch.blue   { background: var(--blue); }
 
 /* ── ALERT DETAIL PANEL ── */
 .alert-detail {
@@ -658,7 +685,13 @@ textarea:focus {
   border: 1px solid var(--border-strong);
 }
 
-.rule-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 14px; }
+/* White text for rule descriptions and removal of leading numbers */
+.rule-desc {
+  font-size: 14px;
+  color: #FFFFFF;
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
 
 .rule-meta {
   display: flex; gap: 28px; flex-wrap: wrap;
@@ -878,4 +911,4 @@ footer {
   .rule-card { flex-direction: column; }
   .rule-card-actions { align-items: stretch; min-width: 0; }
   .modal-actions { flex-direction: column-reverse; }
-}
+}}
