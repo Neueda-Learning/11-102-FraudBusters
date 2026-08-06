@@ -3,6 +3,8 @@ package com.FraudBusters.TransactionMonitoring.repository;
 
 import com.FraudBusters.TransactionMonitoring.models.AlertEntity;
 import com.FraudBusters.TransactionMonitoring.models.enums.AlertStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,6 +20,9 @@ public interface AlertEntityRepository extends JpaRepository<AlertEntity, Long> 
 
     /** Returns CLOSED and DISMISSED alerts sorted by most recently closed first. */
     List<AlertEntity> findByStatusInOrderByClosedAtDesc(List<AlertStatus> statuses);
+
+    /** Returns alerts of one status with pageable sorting. */
+    Page<AlertEntity> findByStatus(AlertStatus status, Pageable pageable);
 
     /** Dashboard summary count by a single status (e.g. OPEN, ACKNOWLEDGED). */
     long countByStatus(AlertStatus status);
