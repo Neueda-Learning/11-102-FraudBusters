@@ -5,6 +5,7 @@ pipeline {
     environment {
         GIT_URL = 'https://github.com/Neueda-Learning/11-102-FraudBusters.git'
         BRANCH = 'main'
+        COMPOSE_DIR = 'FraudBuster'
     }
 
     stages {
@@ -16,22 +17,27 @@ pipeline {
             }
         }
 
-
         stage('Stop Existing Containers') {
             steps {
-                sh 'docker-compose down || true'
+                dir("${COMPOSE_DIR}") {
+                    sh 'docker-compose down || true'
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker-compose build --no-cache'
+                dir("${COMPOSE_DIR}") {
+                    sh 'docker-compose build --no-cache'
+                }
             }
         }
 
         stage('Deploy') {
             steps {
-                sh 'docker-compose up -d'
+                dir("${COMPOSE_DIR}") {
+                    sh 'docker-compose up -d'
+                }
             }
         }
 
@@ -44,7 +50,9 @@ pipeline {
 
     post {
         always {
-            sh 'docker-compose ps || true'
+            dir("${COMPOSE_DIR}") {
+                sh 'docker-compose ps || true'
+            }
         }
     }
 }
