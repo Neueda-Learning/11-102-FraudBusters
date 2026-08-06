@@ -5,6 +5,7 @@ pipeline {
     environment {
         GIT_URL = 'https://github.com/Neueda-Learning/11-102-FraudBusters.git'
         BRANCH = 'main'
+        PROJECT_DIR = 'FraudBuster'
         COMPOSE_FILE = 'FraudBuster/docker-compose.yml'
     }
 
@@ -12,7 +13,7 @@ pipeline {
 
         stage('Checkout Source') {
             steps {
-                checkout scm
+                git branch: "${BRANCH}", url: "${GIT_URL}"
             }
         }
 
@@ -21,38 +22,57 @@ pipeline {
                 sh 'pwd'
                 sh 'ls -la'
                 sh 'ls -la FraudBuster || true'
+                sh 'test -f FraudBuster/docker-compose.yml'
+            }
+        }
+
+        stage('Build Backend (Maven)') {
+            steps {
+                dir('FraudBuster/backend/TransactionMonitoring') {
+                    sh 'chmod +x mvnw || true'
+                    sh './mvnw clean verify -DskipTests'
+                }
             }
         }
 
         stage('Stop Existing Containers') {
             steps {
-                sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" down || true'
+                sh 'docker-compose -f ${COMPOSE_FILE} down || true'
             }
         }
 
         stage('Build Docker Images') {
             steps {
-                sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" build --no-cache'
+                sh 'docker-compose -f ${COMPOSE_FILE} build --no-cache'
             }
         }
 
         stage('Deploy') {
             steps {
-                sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" up -d'
+                sh 'docker-compose -f ${COMPOSE_FILE} up -d'
             }
         }
 
-        stage('Verify') {
+        stage('Wait for Health') {
             steps {
-                sh 'docker ps'
-                sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" ps'
+                sh 'sleep 30'
+            }
+        }
+
+        stage('Verify Containers Running') {
+            steps {
+                sh 'docker-compose -f ${COMPOSE_FILE} ps'
+                sh 'docker ps --format "table {{.Names}}\\t{{.Status}}"'
             }
         }
     }
 
     post {
         always {
-            sh 'docker compose -f "$WORKSPACE/${COMPOSE_FILE}" ps || true'
+            sh 'docker-compose -f ${COMPOSE_FILE} ps || true'
+        }
+        failure {
+            sh 'docker-compose -f ${COMPOSE_FILE} logs --tail=100 || true'
         }
     }
 }
