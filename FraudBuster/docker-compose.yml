@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: fraudbusters-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: n3u3da!
+      MYSQL_DATABASE: FraudBustersDB
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - fraudbusters-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pn3u3da!"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./backend/TransactionMonitoring
+      dockerfile: Dockerfile
+    container_name: fraudbusters-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:mysql://mysql:3306/FraudBustersDB?allowPublicKeyRetrieval=true&useSSL=false
+      DB_USER: root
+      DB_PASS: n3u3da!
+    ports:
+      - "8082:8082"
+    networks:
+      - fraudbusters-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: dockerfile
+    container_name: fraudbusters-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8085:80"
+    networks:
+      - fraudbusters-network
+
+volumes:
+  mysql-data:
+
+networks:
+  fraudbusters-network:
