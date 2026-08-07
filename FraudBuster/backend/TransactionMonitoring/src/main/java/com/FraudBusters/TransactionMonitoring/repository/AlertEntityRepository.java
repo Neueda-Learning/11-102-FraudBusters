@@ -42,4 +42,11 @@ public interface AlertEntityRepository extends JpaRepository<AlertEntity, Long> 
 
     /** Dashboard recent alerts card: newest 5 OPEN alerts. */
     List<AlertEntity> findTop5ByStatusOrderByCreatedAtDesc(AlertStatus status);
+
+    /**
+     * Dashboard rule chart source data.
+     * Returns the number of alerts grouped by the originating rule code.
+     */
+    @Query("SELECT a.rule.ruleCode, COUNT(a) FROM AlertEntity a GROUP BY a.rule.ruleCode")
+    List<Object[]> countAlertsGroupedByRuleCode();
 }
