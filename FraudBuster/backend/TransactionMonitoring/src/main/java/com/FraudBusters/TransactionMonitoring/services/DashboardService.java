@@ -11,8 +11,10 @@ import com.FraudBusters.TransactionMonitoring.repository.AlertTransactionEntityR
 import com.FraudBusters.TransactionMonitoring.repository.TransactionEntityRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,12 @@ public class DashboardService {
     private final AlertEntityRepository alertEntityRepository;
     private final TransactionEntityRepository transactionEntityRepository;
     private final AlertTransactionEntityRepo alertTransactionEntityRepo;
+
+    private static final List<String> DASHBOARD_RULE_ORDER = List.of(
+            "AMOUNT_THRESHOLD",
+            "VELOCITY",
+            "NEW_PAYEE",
+            "DAILY_LIMIT");
 
     /**
      * Builds top summary cards payload.
@@ -64,6 +72,39 @@ public class DashboardService {
                 .stream()
                 .map(this::toRecentAlertItem)
                 .toList();
+    }
+
+    /**
+     * Returns the bar-chart data for the dashboard rule execution graph.
+     * The frontend expects these stable keys:
+     * AMOUNT_THRESHOLD, VELOCITY, NEW_PAYEE, DAILY_LIMIT.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Long> getRuleStats() {
+        Map<String, Long> stats = new LinkedHashMap<>();
+        DASHBOARD_RULE_ORDER.forEach(ruleKey -> stats.put(ruleKey, 0L));
+
+        alertEntityRepository.countAlertsGroupedByRuleCode().forEach(row -> {
+            if (row == null || row.length < 2 || row[0] == null) {
+                return;
+            }
+
+            String dashboardKey = mapToDashboardRuleKey(row[0].toString());
+            long count = row[1] instanceof Number number ? number.longValue() : 0L;
+
+            if (stats.containsKey(dashboardKey)) {
+                stats.put(dashboardKey, count);
+            }
+        });
+
+        return stats;
+    }
+
+    private String mapToDashboardRuleKey(String ruleCode) {
+        if ("VELOCITY_CHECK".equalsIgnoreCase(ruleCode)) {
+            return "VELOCITY";
+        }
+        return ruleCode;
     }
 
     private DashboardRecentAlertItemDTO toRecentAlertItem(AlertEntity alert) {

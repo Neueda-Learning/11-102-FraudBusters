@@ -4,6 +4,7 @@ import com.FraudBusters.TransactionMonitoring.models.dto.DashboardRecentAlertIte
 import com.FraudBusters.TransactionMonitoring.models.dto.DashboardSummaryResponseDTO;
 import com.FraudBusters.TransactionMonitoring.services.DashboardService;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -32,6 +33,12 @@ public class DashboardController {
     @GetMapping("/recent-alerts")
     public ResponseEntity<List<DashboardRecentAlertItemDTO>> getRecentOpenAlerts() {
         return ResponseEntity.ok(dashboardService.getRecentOpenAlerts());
+    }
+
+    /** Endpoint: GET /api/dashboard/rule-stats */
+    @GetMapping("/rule-stats")
+    public ResponseEntity<Map<String, Long>> getRuleStats() {
+        return ResponseEntity.ok(dashboardService.getRuleStats());
     }
 }
 
